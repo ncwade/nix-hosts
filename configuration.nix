@@ -6,8 +6,8 @@
 
 {
   imports =
-    [ # Include the results of the hardware scan.
-      ./lucy.nix
+    [
+      ./<replace me>.nix
       ./ncwade.nix
     ];
 
