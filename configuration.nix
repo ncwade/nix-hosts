@@ -7,8 +7,7 @@
 {
   imports =
     [
-      ./<replace me>.nix
-      ./ncwade.nix
+      ./host/<replace me>.nix
     ];
 
   # This value determines the NixOS release from which the default
