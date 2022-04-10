@@ -6,6 +6,7 @@
     ../ncwade/home-cli.nix
     ../services/base.nix
     ../services/ssh.nix
+    ../services/dns.nix
   ];
 
   boot.loader.grub.enable = false;
