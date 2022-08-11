@@ -12,12 +12,20 @@
   # high res displays
   hardware.video.hidpi.enable = lib.mkDefault true;
   # Enable the X11 windowing system.
-  services.xserver.enable = true;
-
-  # Enable the Plasma 5 Desktop Environment.
-  services.xserver.displayManager.gdm.enable = true;
-  services.xserver.desktopManager.gnome.enable = true;
-  services.xserver.xkbOptions = "ctrl:nocaps";
+  services.xserver = {
+    enable = true;
+    desktopManager = {
+      default = "xfce";
+      xterm.enable = false;
+      xfce = {
+        enable = true;
+        #noDesktop = true;
+        #enableXfwm = false;
+      }
+    };
+    #windowManager.i3.enable = true;
+    xkbOptions = "ctrl:nocaps";
+  };
 
   # Enable sound.
   sound.enable = true;
