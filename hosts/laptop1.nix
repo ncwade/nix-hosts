@@ -37,4 +37,8 @@
   networking.interfaces.wlp2s0.useDHCP = true;
   networking.networkmanager.enable = true;
   networking.hostName = "laptop1";
+
+  system.stateVersion = "21.11";
+  system.autoUpgrade.enable = true;
+  system.autoUpgrade.allowReboot = false;
 }
