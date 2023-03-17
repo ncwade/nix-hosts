@@ -3,7 +3,7 @@
 {
   imports = [
     (modulesPath + "/installer/scan/not-detected.nix")
-    ../ncwade/home-cli.nix
+    ../services/common.nix
     ../services/base.nix
     ../services/ssh.nix
   ];
