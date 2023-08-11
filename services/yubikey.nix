@@ -24,6 +24,5 @@
     yubico-piv-tool
     yubikey-personalization
     gnupg
-    pass
   ];
 }

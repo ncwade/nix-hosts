@@ -4,13 +4,16 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     home-manager.url = "github:nix-community/home-manager";
+    hyprland.url = "github:hyprwm/Hyprland";
   };
 
-  outputs = { self, nixpkgs, ... }@inputs: {
+  outputs = { self, nixpkgs, hyprland, ... }@inputs: {
     nixosConfigurations."laptop1" = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
-      specialArgs = inputs;
+      specialArgs = { inherit inputs; };
       modules = [
+        hyprland.nixosModules.default
+        {programs.hyprland.enable = true;}
         ./hosts/laptop1.nix
       ];
     };
