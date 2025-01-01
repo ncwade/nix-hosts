@@ -1,18 +1,10 @@
-ARCH ?= x86_64
-ANYWHERE_RUN=github:nix-community/nixos-anywhere -- --flake '.\#devvm-$(ARCH)' --target-host root@192.0.2.1
+ARCH ?= intel
 
+result/iso/nix-base.iso:
+	nix build .#isoConfigs.base-iso-$(ARCH).config.system.build.isoImage
 
-vm/pack:
-	packer build --var "iso_path=result/iso/nixos-25.05.20241229.88195a9-x86_64-linux.iso" nixos.pkr.hcl
-vm/create:
-	vagrant up
-vm/destroy:
-	vagrant destroy
-vm/init:
-	vagrant ssh -c "wget -O - https://github.com/ncwade.keys >> /home/vagrant/.ssh/authorized_keys"
+vm: result/iso/nix-base.iso
+	packer build --var "iso_path=result/iso/nix-base.iso" --var "arch=$(ARCH)" nixos.pkr.hcl
+
 host/nix:
 	curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install --determinate
-vm/infect:
-	nix run $(ANYWHERE_RUN)
-vm/repair:
-	nix run $(ANYWHERE_RUN) --phases install,reboot

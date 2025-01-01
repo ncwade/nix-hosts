@@ -10,29 +10,18 @@
   };
 
   outputs = { self, nixpkgs, hyprland, disko, ... }@inputs: {
-    nixosConfigurations."base-iso-intel" = nixpkgs.lib.nixosSystem {
+    isoConfigs."base-iso-intel" = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
+      specialArgs = { inherit inputs; };
       modules = [
-        ({ pkgs, modulesPath, ... }: {
-          imports = [ (modulesPath + "/installer/cd-dvd/installation-cd-minimal.nix") ];
-          isoImage.squashfsCompression = "gzip -Xcompression-level 1";
-          systemd.services.sshd.wantedBy = pkgs.lib.mkForce [ "multi-user.target" ];
-          hardware.enableAllHardware = true;
-          isoImage.isoName = pkgs.lib.mkForce "nix-base-x86_64.iso";
-          users.users.root.initialHashedPassword = pkgs.lib.mkForce null;
-          users.users.root.initialPassword = null;
-          isoImage.makeEfiBootable = true;
-          isoImage.makeUsbBootable = true;
-          virtualisation.vmware.guest.enable = true;
-          boot.loader.systemd-boot.enable = true;
-          
-          users.users.root.openssh.authorizedKeys.keys = [
-            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICy5wxb5jwVx1YDgXpGBVIF50w/i6R+RjuPfi2/btBLW"
-          ];
-          networking = {
-            useDHCP = true;
-          };
-        })
+        ./hosts/iso.nix
+      ];
+    };
+    isoConfigs."base-iso-arm" = nixpkgs.lib.nixosSystem {
+      system = "aarch64-linux";
+      specialArgs = { inherit inputs; };
+      modules = [
+        ./hosts/iso.nix
       ];
     };
     nixosConfigurations."laptop1" = nixpkgs.lib.nixosSystem {
@@ -65,7 +54,7 @@
         ./hosts/workstation1.nix
       ];
     };
-    nixosConfigurations."devvm-x86_64" = nixpkgs.lib.nixosSystem {
+    nixosConfigurations."devvm-intel" = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
       specialArgs = inputs;
       modules = [
@@ -73,7 +62,7 @@
         ./hosts/devvm.nix
       ];
     };
-    nixosConfigurations."devvm-aarch64" = nixpkgs.lib.nixosSystem {
+    nixosConfigurations."devvm-arm" = nixpkgs.lib.nixosSystem {
       system = "aarch64-linux";
       specialArgs = inputs;
       modules = [

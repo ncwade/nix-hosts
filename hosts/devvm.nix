@@ -9,13 +9,14 @@
     (modulesPath + "/installer/scan/not-detected.nix")
     (modulesPath + "/profiles/qemu-guest.nix")
     ./devvm-disko.nix
+    ../services/common.nix
+    ../services/base.nix
+    ../services/gui.nix
   ];
 
-  boot.loader.grub = {
-    devices = [ "/dev/sda" ];
-    efiSupport = true;
-    efiInstallAsRemovable = true;
-  };
+  # Use the systemd-boot EFI boot loader.
+  boot.loader.systemd-boot.enable = true;
+  boot.loader.efi.canTouchEfiVariables = true;
 
   services.openssh.enable = true;
 
