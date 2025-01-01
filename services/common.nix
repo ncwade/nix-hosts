@@ -20,6 +20,7 @@
       dockerCompat = true;
     };
   };
+  programs.fish.enable = true;
 
   users.users.ncwade = {
     openssh.authorizedKeys.keys = [
