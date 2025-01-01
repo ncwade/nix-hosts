@@ -45,9 +45,10 @@ build {
     inline = [
       "git clone https://github.com/ncwade/nix-config.git",
       "cd nix-config",
-      "nix --experimental-features "nix-command flakes" run github:nix-community/disko -- --mode disko ./hosts/devvm-disko.nix",
+      "nix --experimental-features \"nix-command flakes\" run github:nix-community/disko -- --mode disko ./hosts/devvm-disko.nix",
+      "nixos-generate-config --no-filesystems --root /mnt",
       "cp -r . /mnt/etc/nixos",
-      "nixos-install --root /mnt --flake '/mnt/etc/nixos#devvm'"
+      "nixos-install --root /mnt --flake '/mnt/etc/nixos#devvm-x86_64'"
     ]
   }
 }
