@@ -23,10 +23,10 @@ source "vmware-iso" "devvm" {
   iso_checksum       = "none"
   iso_url            = var.iso_path
   vm_name            = "devvm"
-  guest_os_type      = "other6xlinux-64"
+  guest_os_type      = "arm-other6xlinux-64"
   cpus               = 9
   cores              = 18
-  memory             = 32000
+  memory             = 24000
   network            = "nat"
   firmware           = "efi"
   disk_size          = 80000
