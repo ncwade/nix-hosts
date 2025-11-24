@@ -4,12 +4,15 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     home-manager.url = "github:nix-community/home-manager";
+    home-manager.inputs.nixpkgs.follows = "nixpkgs";
     hyprland.url = "github:hyprwm/Hyprland";
     disko.url = "github:nix-community/disko";
     disko.inputs.nixpkgs.follows = "nixpkgs";
+    nix-darwin.url = "github:LnL7/nix-darwin";
+    nix-darwin.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs = { self, nixpkgs, hyprland, disko, ... }@inputs: {
+  outputs = { self, nixpkgs, hyprland, disko, nix-darwin, home-manager, ... }@inputs: {
     isoConfigs."base-iso-intel" = nixpkgs.lib.nixosSystem {
       system = "x86_64-linux";
       specialArgs = { inherit inputs; };
@@ -68,6 +71,17 @@
       modules = [
         disko.nixosModules.disko
         ./hosts/devvm.nix
+      ];
+    };
+    darwinConfigurations."sungrave" = nix-darwin.lib.darwinSystem {
+      modules = [
+        ./hosts/sungrave.nix
+	home-manager.darwinModules.home-manager  {
+          home-manager.useGlobalPkgs = true;
+          home-manager.useUserPackages = true;
+          home-manager.verbose = true;
+	  home-manager.users.ncwade = import ./home-manager/ncwade.nix;
+        }
       ];
     };
   };
