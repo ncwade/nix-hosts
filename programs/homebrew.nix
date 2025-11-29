@@ -29,6 +29,8 @@
       "vagrant"
       "rectangle-pro"
       "yubico-authenticator"
+      "orion"
+      "signal"
     ];
   };
 }
