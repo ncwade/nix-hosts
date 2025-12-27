@@ -17,34 +17,24 @@
       home-manager,
       ...
     }@inputs:
+    let
+      mkDarwinHost = hostname: { extraModules ? [] }: nix-darwin.lib.darwinSystem {
+        specialArgs = inputs;
+        modules = [
+          ./hosts/nix-darwin.nix
+          ./programs/macos.nix
+          home-manager.darwinModules.home-manager
+          {
+            home-manager.useGlobalPkgs = true;
+            home-manager.useUserPackages = true;
+            home-manager.verbose = true;
+            home-manager.users.ncwade = import ./home-manager/ncwade.nix;
+          }
+        ] ++ extraModules;
+      };
+    in
     {
-      darwinConfigurations."luna" = nix-darwin.lib.darwinSystem {
-        specialArgs = inputs;
-        modules = [
-          ./hosts/nix-darwin.nix
-          ./programs/macos.nix
-          home-manager.darwinModules.home-manager
-          {
-            home-manager.useGlobalPkgs = true;
-            home-manager.useUserPackages = true;
-            home-manager.verbose = true;
-            home-manager.users.ncwade = import ./home-manager/ncwade.nix;
-          }
-        ];
-      };
-      darwinConfigurations."sungrave" = nix-darwin.lib.darwinSystem {
-        specialArgs = inputs;
-        modules = [
-          ./hosts/nix-darwin.nix
-          ./programs/macos.nix
-          home-manager.darwinModules.home-manager
-          {
-            home-manager.useGlobalPkgs = true;
-            home-manager.useUserPackages = true;
-            home-manager.verbose = true;
-            home-manager.users.ncwade = import ./home-manager/ncwade.nix;
-          }
-        ];
-      };
+      darwinConfigurations."luna" = mkDarwinHost "luna" {};
+      darwinConfigurations."retired-work-mac" = mkDarwinHost "retired-work-mac" {};
     };
 }

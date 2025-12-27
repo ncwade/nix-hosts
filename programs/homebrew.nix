@@ -26,7 +26,6 @@
       "keepingyouawake"
       "vagrant"
       "vagrant-vmware-utility"
-      "vagrant"
       "rectangle-pro"
       "yubico-authenticator"
       "orion"
