@@ -1,5 +1,10 @@
 { ... }:
 {
+  system.keyboard = {
+    enableKeyMapping = true;
+    remapCapsLockToControl = true;
+  };
+
   system.defaults = {
     dock = {
       autohide = true;
