@@ -20,7 +20,7 @@
   programs.zsh.enable = true;
   programs.fish.enable = true;
   environment.systemPackages = [
-    pkgs.neofetch
+    pkgs.fastfetch
     pkgs.neovim
     pkgs.starship
   ];
