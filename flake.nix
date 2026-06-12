@@ -21,7 +21,10 @@
       system = "aarch64-darwin";
       linuxSystem = "aarch64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
-      linuxPkgs = nixpkgs.legacyPackages.${linuxSystem};
+      linuxPkgs = import nixpkgs {
+        system = linuxSystem;
+        config.allowUnfree = true;
+      };
       corpUbuntuVm = pkgs.callPackage ./packages/corp-ubuntu-vm.nix {};
       mkDarwinHost = hostname: { extraModules ? [] }: nix-darwin.lib.darwinSystem {
         specialArgs = inputs;
