@@ -18,6 +18,11 @@
       ...
     }@inputs:
     let
+      system = "aarch64-darwin";
+      linuxSystem = "aarch64-linux";
+      pkgs = nixpkgs.legacyPackages.${system};
+      linuxPkgs = nixpkgs.legacyPackages.${linuxSystem};
+      corpUbuntuVm = pkgs.callPackage ./packages/corp-ubuntu-vm.nix {};
       mkDarwinHost = hostname: { extraModules ? [] }: nix-darwin.lib.darwinSystem {
         specialArgs = inputs;
         modules = [
@@ -34,6 +39,18 @@
       };
     in
     {
+      packages.${system}.corp-ubuntu-vm = corpUbuntuVm;
+      apps.${system}.corp-ubuntu-vm = {
+        type = "app";
+        program = "${corpUbuntuVm}/bin/corp-ubuntu-vm";
+      };
+      homeConfigurations.corp-ubuntu-vm = home-manager.lib.homeManagerConfiguration {
+        pkgs = linuxPkgs;
+        modules = [
+          ./home-manager/corp-ubuntu-vm.nix
+        ];
+      };
+
       darwinConfigurations."luna" = mkDarwinHost "luna" {};
       darwinConfigurations."retired-work-mac" = mkDarwinHost "retired-work-mac" {};
     };
