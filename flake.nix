@@ -53,6 +53,12 @@
           ./home-manager/corp-ubuntu-vm.nix
         ];
       };
+      homeConfigurations.mvm = home-manager.lib.homeManagerConfiguration {
+        pkgs = linuxPkgs;
+        modules = [
+          ./home-manager/mvm.nix
+        ];
+      };
 
       darwinConfigurations."luna" = mkDarwinHost "luna" {};
       darwinConfigurations."retired-work-mac" = mkDarwinHost "retired-work-mac" {};
