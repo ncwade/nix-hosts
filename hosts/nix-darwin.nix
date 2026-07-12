@@ -12,6 +12,16 @@
   system.stateVersion = 4;
 
   nixpkgs.hostPlatform = "aarch64-darwin";
+  nixpkgs.overlays = [
+    # Temporary workaround for ld64-957.1 trapping with fast libc++ hardening;
+    # use LLD when linking LiveKit WebRTC.
+    (final: prev: {
+      livekit-libwebrtc = prev.livekit-libwebrtc.overrideAttrs (_: {
+        NIX_CFLAGS_LINK = "-fuse-ld=${final.lib.getExe' final.llvmPackages.lld "ld64.lld"}";
+      });
+    })
+  ];
+
   system.primaryUser = "ncwade";
   users.users.ncwade = {
     name = "ncwade";
