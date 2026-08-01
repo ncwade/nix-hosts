@@ -7,6 +7,8 @@
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
     nix-darwin.url = "github:LnL7/nix-darwin";
     nix-darwin.inputs.nixpkgs.follows = "nixpkgs";
+    disko.url = "github:nix-community/disko";
+    disko.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs =
@@ -15,11 +17,13 @@
       nixpkgs,
       nix-darwin,
       home-manager,
+      disko,
       ...
     }@inputs:
     let
       system = "aarch64-darwin";
       linuxSystem = "aarch64-linux";
+      serverSystem = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
       linuxPkgs = import nixpkgs {
         system = linuxSystem;
@@ -72,5 +76,14 @@
 
       darwinConfigurations."luna" = mkDarwinHost "luna" {};
       darwinConfigurations."retired-work-mac" = mkDarwinHost "retired-work-mac" {};
+
+      nixosConfigurations.retired-router = nixpkgs.lib.nixosSystem {
+        system = serverSystem;
+        specialArgs = inputs;
+        modules = [
+          disko.nixosModules.disko
+          ./hosts/retired-router.nix
+        ];
+      };
     };
 }
