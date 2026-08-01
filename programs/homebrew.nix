@@ -2,7 +2,12 @@
 {
   homebrew = {
     enable = true;
-    onActivation.cleanup = "uninstall";
+    onActivation = {
+      # Keep routine darwin-rebuild runs fast; do explicit brew maintenance separately.
+      cleanup = "none";
+      autoUpdate = false;
+      upgrade = false;
+    };
     taps = [
       "chainguard-dev/tap"
       "work-org/tap"
@@ -32,6 +37,7 @@
       "1password"
       "1password-cli"
       "beyond-compare"
+      "chatgpt"
       "datagrip"
       "docker-desktop"
       "firefox"
