@@ -44,6 +44,7 @@
       "font-jetbrains-mono"
       "font-jetbrains-mono-nerd-font"
       "ghostty"
+      "google-chrome"
       "microsoft-edge"
       "notion"
       "orion"
