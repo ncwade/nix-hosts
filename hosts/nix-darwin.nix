@@ -26,6 +26,9 @@
     pkgs.neovim
     pkgs.starship
   ];
+  fonts.packages = [
+    pkgs.nerd-fonts.jetbrains-mono
+  ];
   security.pam.services.sudo_local = {
     touchIdAuth = true;
     reattach = true;

@@ -10,39 +10,27 @@
     };
     taps = [
       "chainguard-dev/tap"
-      "work-org/tap"
     ];
     brews = [
-      "awscli"
+      # Keep tools whose Nix packages are missing or need macOS integration.
       "chainguard-dev/tap/chainctl"
+      # The current nixpkgs build depends on insecure python3.14-ecdsa-0.19.2.
       "checkov"
-      "gopls"
-      "helm"
-      "krew"
-      "libpq"
-      "lua"
-      "markdownlint-cli"
-      "opa"
       "opensc"
       "pkcs11-tools"
-      "postgresql@14"
-      "redis"
-      "telnet"
-      "work-org/tap/zarf"
-      "trivy"
       "wireshark"
-      "ykman"
     ];
     casks = [
       "1password"
+      # Keep the signed upstream binary for desktop-app integration.
       "1password-cli"
       "beyond-compare"
       "chatgpt"
       "datagrip"
       "docker-desktop"
       "firefox"
+      # The current nixpkgs source hash is stale, so this derivation cannot build.
       "font-jetbrains-mono"
-      "font-jetbrains-mono-nerd-font"
       "ghostty"
       "google-chrome"
       "microsoft-edge"
