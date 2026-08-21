@@ -24,6 +24,7 @@ in
         "/Applications/Orion.app"
         "/Applications/1Password.app"
         "/Applications/Zed.app"
+        "/Applications/Cursor.app"
         "/Applications/Ghostty.app"
         "/System/Applications/Messages.app"
         "/System/Applications/Mail.app"
