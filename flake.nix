@@ -37,9 +37,12 @@
           extraModules ? [ ],
           homeManagerModule ? ./home-manager/ncwade.nix,
           macosModule ? ./programs/macos.nix,
+          username ? "ncwade",
         }:
         nix-darwin.lib.darwinSystem {
-          specialArgs = inputs;
+          specialArgs = inputs // {
+            inherit username;
+          };
           modules = [
             ./hosts/nix-darwin.nix
             macosModule
@@ -48,7 +51,7 @@
               home-manager.useGlobalPkgs = true;
               home-manager.useUserPackages = true;
               home-manager.verbose = true;
-              home-manager.users.ncwade = import homeManagerModule;
+              home-manager.users.${username} = import homeManagerModule;
             }
           ]
           ++ extraModules;
@@ -85,6 +88,7 @@
       darwinConfigurations."luna" = mkDarwinHost "luna" { };
       darwinConfigurations."retired-work-mac" = mkDarwinHost "retired-work-mac" { };
       darwinConfigurations."work-mac" = mkDarwinHost "work-mac" {
+        username = "workuser";
         homeManagerModule = ./home-manager/ncwade-cli.nix;
         macosModule = ./programs/macos-cli.nix;
         extraModules = [ ./programs/homebrew-cli.nix ];

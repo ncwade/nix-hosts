@@ -1,5 +1,6 @@
 {
   pkgs,
+  username,
   ...
 }:
 
@@ -13,10 +14,10 @@
 
   nixpkgs.hostPlatform = "aarch64-darwin";
 
-  system.primaryUser = "ncwade";
-  users.users.ncwade = {
-    name = "ncwade";
-    home = "/Users/ncwade";
+  system.primaryUser = username;
+  users.users.${username} = {
+    name = username;
+    home = "/Users/${username}";
   };
 
   programs.zsh.enable = true;
