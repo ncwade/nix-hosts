@@ -31,20 +31,28 @@
       };
       corpUbuntuVm = pkgs.callPackage ./packages/corp-ubuntu-vm.nix {};
       morningStar = pkgs.callPackage ./infra/retired-cloud-host {};
-      mkDarwinHost = hostname: { extraModules ? [] }: nix-darwin.lib.darwinSystem {
-        specialArgs = inputs;
-        modules = [
-          ./hosts/nix-darwin.nix
-          ./programs/macos.nix
-          home-manager.darwinModules.home-manager
-          {
-            home-manager.useGlobalPkgs = true;
-            home-manager.useUserPackages = true;
-            home-manager.verbose = true;
-            home-manager.users.ncwade = import ./home-manager/ncwade.nix;
-          }
-        ] ++ extraModules;
-      };
+      mkDarwinHost =
+        hostname:
+        {
+          extraModules ? [ ],
+          homeManagerModule ? ./home-manager/ncwade.nix,
+          macosModule ? ./programs/macos.nix,
+        }:
+        nix-darwin.lib.darwinSystem {
+          specialArgs = inputs;
+          modules = [
+            ./hosts/nix-darwin.nix
+            macosModule
+            home-manager.darwinModules.home-manager
+            {
+              home-manager.useGlobalPkgs = true;
+              home-manager.useUserPackages = true;
+              home-manager.verbose = true;
+              home-manager.users.ncwade = import homeManagerModule;
+            }
+          ]
+          ++ extraModules;
+        };
     in
     {
       packages.${system} = {
@@ -74,8 +82,13 @@
         ];
       };
 
-      darwinConfigurations."luna" = mkDarwinHost "luna" {};
-      darwinConfigurations."retired-work-mac" = mkDarwinHost "retired-work-mac" {};
+      darwinConfigurations."luna" = mkDarwinHost "luna" { };
+      darwinConfigurations."retired-work-mac" = mkDarwinHost "retired-work-mac" { };
+      darwinConfigurations."work-mac" = mkDarwinHost "work-mac" {
+        homeManagerModule = ./home-manager/ncwade-cli.nix;
+        macosModule = ./programs/macos-cli.nix;
+        extraModules = [ ./programs/homebrew-cli.nix ];
+      };
 
       nixosConfigurations.retired-router = nixpkgs.lib.nixosSystem {
         system = serverSystem;
