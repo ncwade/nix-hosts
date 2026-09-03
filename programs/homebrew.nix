@@ -26,10 +26,6 @@
       "1password-cli"
       "beyond-compare"
       "chatgpt"
-      # Signed upstream desktop app; nixpkgs code-cursor invalidates the
-      # notarized macOS bundle during fixup.
-      "cursor"
-      "cursor-cli"
       "datagrip"
       "docker-desktop"
       "firefox"

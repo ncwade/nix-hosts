@@ -1,0 +1,360 @@
+diff --git a/README.md b/README.md
+index 1026f7d..9a96b43 100644
+--- a/README.md
++++ b/README.md
+@@ -27,10 +27,12 @@ At boot the service writes `/run/kairos-nix/status.json`.
+ 
+ ## Build and verify
+ 
+-The current POC targets x86-64/amd64.
++The POC produces both x86-64/amd64 and ARM64 images. The amd64 image remains
++the default:
+ 
+ ```console
+ nix build
++nix build .#ociArchiveArm64
+ nix flake check
+ ```
+ 
+@@ -67,9 +69,10 @@ placeholder must be replaced.
+ 
+ ## Test the VM on macOS
+ 
+-Generate the raw disk on a Linux host as above, then copy the `.raw` file from
+-`./output` to the Mac. Raw disk generation cannot run directly on macOS because
+-AuroraBoot depends on Linux loop devices and filesystem mounts.
++Generate the raw disk from either architecture's OCI archive on a Linux host as
++above, then copy the `.raw` file from `./output` to the Mac. Raw disk generation
++cannot run directly on macOS because AuroraBoot depends on Linux loop devices
++and filesystem mounts.
+ 
+ With [Nix installed](https://nixos.org/download/), boot the disk using the
+ flake-provided QEMU app:
+@@ -78,11 +81,20 @@ flake-provided QEMU app:
+ nix run .#test-vm -- /path/to/kairos.raw
+ ```
+ 
++On Apple Silicon, use the ARM64 image and native launcher for hardware
++acceleration:
++
++```console
++# On Linux, build .#ociArchiveArm64 and run .#build-vm against the result.
++# Copy the resulting raw disk to the Mac, then:
++nix run .#test-vm-arm64 -- /path/to/kairos-arm64.raw
++```
++
+ The app supplies QEMU and UEFI firmware, opens the VM display, forwards host
+ port 2222 to the guest's SSH port, and uses QEMU snapshot mode so the source
+ disk is not modified. Set `KAIROS_SSH_PORT` to change the host port. Intel Macs
+-use Apple's HVF acceleration; Apple Silicon Macs emulate this POC's x86-64
+-image and will boot more slowly.
++use Apple's HVF acceleration for amd64; Apple Silicon Macs use HVF for ARM64
++and can still emulate amd64 more slowly.
+ 
+ After replacing the key in `cloud-config.yaml` before disk creation, connect
+ with:
+@@ -106,12 +118,14 @@ nix shell nixpkgs#skopeo -c \
+   skopeo copy oci-archive:./result docker://registry.example.com/kairos/nix-poc:0.1.0
+ ```
+ 
+-Then use that image reference as the install/upgrade source in Kairos. Increment
+-`tag` in `vms/poc.nix` for each immutable OS revision.
++Then use that image reference as the install/upgrade source in Kairos. Use
++architecture-specific tags when publishing the separate archives, or combine
++them into a multi-platform manifest. Increment `tag` in `vms/poc.nix` for each
++immutable OS revision.
+ 
+ ## Extending the POC
+ 
+-`lib.mkKairosImage` accepts a root derivation and image metadata. Add another
+-file under `vms/`, construct its root from Nix packages and configuration, and
+-call the same function. Do not overwrite Kairos-owned paths such as
+-`/etc/kairos-release`, `/boot/vmlinuz`, or `/boot/initrd`.
++`lib.mkKairosImage` accepts an architecture, root derivation, and image
++metadata. Add another file under `vms/`, construct its root from Nix packages
++and configuration, and call the same function. Do not overwrite Kairos-owned
++paths such as `/etc/kairos-release`, `/boot/vmlinuz`, or `/boot/initrd`.
+diff --git a/flake.nix b/flake.nix
+index 2b7b2f4..d2e3536 100644
+--- a/flake.nix
++++ b/flake.nix
+@@ -14,10 +14,19 @@
+       ];
+       pkgs = import nixpkgs { inherit system; };
+       mkKairosImage = import ./lib/mk-kairos-image.nix { inherit pkgs; };
+-      vm = import ./vms/poc.nix { inherit pkgs mkKairosImage; };
++      mkVm =
++        imagePkgs: architecture:
++        import ./vms/poc.nix {
++          pkgs = imagePkgs;
++          mkKairosImage = import ./lib/mk-kairos-image.nix { pkgs = imagePkgs; };
++          inherit architecture;
++        };
++      vm = mkVm pkgs "amd64";
++      arm64Vm = mkVm pkgs.pkgsCross.aarch64-multiplatform "arm64";
+ 
+-      ociArchive =
+-        pkgs.runCommand "${vm.name}-${vm.tag}.oci.tar"
++      mkOciArchive =
++        image:
++        pkgs.runCommand "${image.name}-${image.tag}.oci.tar"
+           {
+             nativeBuildInputs = [ pkgs.skopeo ];
+           }
+@@ -25,24 +34,27 @@
+             export TMPDIR=$PWD/tmp
+             mkdir "$TMPDIR"
+             skopeo --tmpdir "$TMPDIR" --insecure-policy copy \
+-              docker-archive:${vm.dockerArchive} \
+-              oci-archive:$out:${vm.tag}
++              docker-archive:${image.dockerArchive} \
++              oci-archive:$out:${image.tag}
+           '';
++      ociArchive = mkOciArchive vm;
++      arm64OciArchive = mkOciArchive arm64Vm;
+ 
+-      verifyImage =
+-        pkgs.runCommand "verify-${vm.name}-${vm.tag}"
++      mkVerifyImage =
++        image: archive:
++        pkgs.runCommand "verify-${image.name}-${image.tag}"
+           {
+             nativeBuildInputs = [ pkgs.jq ];
+           }
+           ''
+             mkdir archive
+-            tar -xf ${ociArchive} -C archive
++            tar -xf ${archive} -C archive
+ 
+             manifest_digest=$(jq -r '.manifests[0].digest' archive/index.json)
+             manifest="archive/blobs/sha256/''${manifest_digest#sha256:}"
+             config_digest=$(jq -r '.config.digest' "$manifest")
+             config="archive/blobs/sha256/''${config_digest#sha256:}"
+-            jq -e '.architecture == "amd64" and .os == "linux"' "$config" >/dev/null
++            jq -e '.architecture == "${image.architecture}" and .os == "linux"' "$config" >/dev/null
+ 
+             : > files
+             : > service
+@@ -50,7 +62,7 @@
+               layer="archive/blobs/sha256/''${layer_digest#sha256:}"
+               tar -tf "$layer" 2>/dev/null | sed -e 's#^\./##' -e 's#^/##' >> files
+               service_member=$(tar -tf "$layer" 2>/dev/null \
+-                | grep -E '^(/|\./)?nix/store/[^/]+-kairos-nix-poc-root/etc/systemd/system/kairos-nix-poc\.service$' \
++                | grep -E '^(/|\./)?nix/store/[^/]+-kairos-nix-poc-[^/]+-root/etc/systemd/system/kairos-nix-poc\.service$' \
+                 || true)
+               if [[ -n "$service_member" ]]; then
+                 tar -xOf "$layer" "$service_member" 2>/dev/null > service
+@@ -69,6 +81,8 @@
+ 
+             touch $out
+           '';
++      verifyImage = mkVerifyImage vm ociArchive;
++      verifyArm64Image = mkVerifyImage arm64Vm arm64OciArchive;
+ 
+       buildVm = pkgs.writeShellApplication {
+         name = "build-kairos-vm";
+@@ -132,7 +146,14 @@
+         {
+           hostPkgs,
+           firmware,
++          guestArchitecture,
+         }:
++        let
++          qemuBinary = if guestArchitecture == "arm64" then "qemu-system-aarch64" else "qemu-system-x86_64";
++          machine = if guestArchitecture == "arm64" then "virt" else "q35";
++          darwinHostArchitecture = if guestArchitecture == "arm64" then "arm64" else "x86_64";
++          linuxHostArchitecture = if guestArchitecture == "arm64" then "aarch64" else "x86_64";
++        in
+         hostPkgs.writeShellApplication {
+           name = "test-kairos-vm";
+           runtimeInputs = [ hostPkgs.qemu ];
+@@ -149,10 +170,10 @@
+             disk=$(realpath "$1")
+ 
+             case "$(uname -s):$(uname -m)" in
+-              Darwin:x86_64)
++              Darwin:${darwinHostArchitecture})
+                 acceleration=(-accel hvf -cpu host)
+                 ;;
+-              Linux:x86_64)
++              Linux:${linuxHostArchitecture})
+                 if [[ -r /dev/kvm && -w /dev/kvm ]]; then
+                   acceleration=(-accel kvm -cpu host)
+                 else
+@@ -160,7 +181,7 @@
+                 fi
+                 ;;
+               *)
+-                echo "Using x86 emulation; booting can be slow on Apple Silicon." >&2
++                echo "Using CPU emulation because the ${guestArchitecture} guest does not match this host." >&2
+                 acceleration=(-accel "tcg,thread=multi" -cpu max)
+                 ;;
+             esac
+@@ -168,9 +189,10 @@
+             nvram_dir=$(mktemp -d)
+             trap 'rm -rf "$nvram_dir"' EXIT
+             cp ${firmware.variables} "$nvram_dir/OVMF_VARS.fd"
++            chmod u+w "$nvram_dir/OVMF_VARS.fd"
+ 
+-            qemu-system-x86_64 \
+-              -machine q35 \
++            ${qemuBinary} \
++              -machine ${machine} \
+               "''${acceleration[@]}" \
+               -m 4096 \
+               -smp 4 \
+@@ -185,19 +207,25 @@
+         hostSystem:
+         let
+           hostPkgs = import nixpkgs { system = hostSystem; };
+-          firmwarePkgs =
+-            if hostSystem == "aarch64-darwin" then import nixpkgs { system = "x86_64-darwin"; } else hostPkgs;
+-          testVm = mkTestVm {
+-            inherit hostPkgs;
+-            firmware = firmwarePkgs.OVMF;
+-          };
++          hostOs = if nixpkgs.lib.hasSuffix "-darwin" hostSystem then "darwin" else "linux";
++          mkTestApp =
++            guestArchitecture:
++            let
++              guestNixCpu = if guestArchitecture == "arm64" then "aarch64" else "x86_64";
++              testVm = mkTestVm {
++                inherit hostPkgs guestArchitecture;
++                firmware = (import nixpkgs { system = "${guestNixCpu}-${hostOs}"; }).OVMF;
++              };
++            in
++            {
++              type = "app";
++              program = "${testVm}/bin/test-kairos-vm";
++              meta.description = "Boot a ${guestArchitecture} Kairos raw disk in an ephemeral QEMU VM";
++            };
+         in
+         {
+-          test-vm = {
+-            type = "app";
+-            program = "${testVm}/bin/test-kairos-vm";
+-            meta.description = "Boot a Kairos raw disk in an ephemeral QEMU VM";
+-          };
++          test-vm = mkTestApp "amd64";
++          test-vm-arm64 = mkTestApp "arm64";
+         }
+       );
+     in
+@@ -209,6 +237,9 @@
+         ociArchive = ociArchive;
+         dockerArchive = vm.dockerArchive;
+         vmRoot = vm.root;
++        ociArchiveArm64 = arm64OciArchive;
++        dockerArchiveArm64 = arm64Vm.dockerArchive;
++        vmRootArm64 = arm64Vm.root;
+       };
+ 
+       apps = testApps // {
+@@ -221,7 +252,10 @@
+         };
+       };
+ 
+-      checks.${system}.image-contract = verifyImage;
++      checks.${system} = {
++        image-contract = verifyImage;
++        image-contract-arm64 = verifyArm64Image;
++      };
+ 
+       formatter = nixpkgs.lib.genAttrs supportedSystems (
+         hostSystem: (import nixpkgs { system = hostSystem; }).nixfmt-tree
+diff --git a/lib/mk-kairos-image.nix b/lib/mk-kairos-image.nix
+index 4e2ae30..2221711 100644
+--- a/lib/mk-kairos-image.nix
++++ b/lib/mk-kairos-image.nix
+@@ -3,6 +3,7 @@
+ {
+   name,
+   tag,
++  architecture,
+   base,
+   root,
+ }:
+@@ -17,12 +18,12 @@ let
+       finalImageTag
+       ;
+     os = "linux";
+-    arch = "amd64";
++    arch = architecture;
+   };
+ in
+ pkgs.dockerTools.buildLayeredImage {
+   inherit name tag;
+   fromImage = baseImage;
+   contents = [ root ];
+-  architecture = "amd64";
++  inherit architecture;
+ }
+diff --git a/vms/poc.nix b/vms/poc.nix
+index 9873688..add9213 100644
+--- a/vms/poc.nix
++++ b/vms/poc.nix
+@@ -1,9 +1,33 @@
+-{ pkgs, mkKairosImage }:
++{
++  pkgs,
++  mkKairosImage,
++  architecture,
++}:
+ 
+ let
+-  name = "kairos-nix-poc";
++  name = "kairos-nix-poc-${architecture}";
+   tag = "0.1.0";
+ 
++  base =
++    if architecture == "amd64" then
++      {
++        imageName = "quay.io/kairos/hadron";
++        imageDigest = "sha256:ca75eb00118696ead63c689f92138da23c7231eb63c2903d7a7e7375ff5f7e83";
++        sha256 = "sha256-qgR+TYyUox8ZBKqjLZ/ysHZNO2kxwHapkaQX4kttp2c=";
++        finalImageName = "quay.io/kairos/hadron";
++        finalImageTag = "v0.5.1-core-amd64-generic-v4.2.0";
++      }
++    else if architecture == "arm64" then
++      {
++        imageName = "quay.io/kairos/hadron";
++        imageDigest = "sha256:d3a6526505743d780e6d2bd35ac680a79a2813e9a2b7bc561cff088d9dcbbba7";
++        sha256 = "sha256-F19NSTTlWDmm7ihvrgkuNmJZ186FVRPYaad4W19E0VQ=";
++        finalImageName = "quay.io/kairos/hadron";
++        finalImageTag = "v0.5.1-core-arm64-generic-v4.2.0";
++      }
++    else
++      throw "unsupported Kairos architecture: ${architecture}";
++
+   report = pkgs.writeShellApplication {
+     name = "kairos-nix-report";
+     runtimeInputs = [
+@@ -51,20 +75,20 @@ let
+   '';
+ 
+   dockerArchive = mkKairosImage {
+-    inherit name tag root;
+-    base = {
+-      imageName = "quay.io/kairos/hadron";
+-      imageDigest = "sha256:ca75eb00118696ead63c689f92138da23c7231eb63c2903d7a7e7375ff5f7e83";
+-      sha256 = "sha256-qgR+TYyUox8ZBKqjLZ/ysHZNO2kxwHapkaQX4kttp2c=";
+-      finalImageName = "quay.io/kairos/hadron";
+-      finalImageTag = "v0.5.1-core-amd64-generic-v4.2.0";
+-    };
++    inherit
++      name
++      tag
++      architecture
++      root
++      base
++      ;
+   };
+ in
+ {
+   inherit
+     name
+     tag
++    architecture
+     root
+     dockerArchive
+     ;

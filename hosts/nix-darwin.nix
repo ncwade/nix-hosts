@@ -1,4 +1,5 @@
 {
+  lib,
   pkgs,
   username,
   ...
@@ -13,6 +14,8 @@
   system.stateVersion = 4;
 
   nixpkgs.hostPlatform = "aarch64-darwin";
+  nixpkgs.config.allowUnfreePredicate = package:
+    builtins.elem (lib.getName package) [ "amp-cli" ];
 
   system.primaryUser = username;
   users.users.${username} = {

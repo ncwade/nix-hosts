@@ -1,6 +1,10 @@
 { pkgs, ... }:
 
 let
+  ampDesktopDmg = pkgs.fetchurl {
+    url = "https://static.ampcode.com/mac/latest.dmg?generation=1788357124312620";
+    hash = "sha256-CUNJkqS69+ldeD7SDU9WvVshYYgmFhcmifUQasf+JeM=";
+  };
   chatgptChromeExtension = pkgs.writeText "chatgpt-chrome-extension.json" ''
     {
       "external_update_url": "https://clients2.google.com/service/update2/crx"
@@ -24,7 +28,7 @@ in
         "/Applications/Orion.app"
         "/Applications/1Password.app"
         "/Applications/Zed.app"
-        "/Applications/Cursor.app"
+        "/Applications/Amp.app"
         "/Applications/Ghostty.app"
         "/System/Applications/Messages.app"
         "/System/Applications/Mail.app"
@@ -56,6 +60,22 @@ in
   };
 
   system.activationScripts.postActivation.text = ''
+    # Install a writable copy so Amp's built-in updater can replace the app.
+    if [ ! -d /Applications/Amp.app ]; then
+      amp_mount="$(mktemp -d /private/tmp/amp-desktop.XXXXXX)"
+
+      cleanup_amp_mount() {
+        /usr/bin/hdiutil detach "$amp_mount" >/dev/null 2>&1 || true
+        rmdir "$amp_mount" >/dev/null 2>&1 || true
+      }
+
+      trap cleanup_amp_mount EXIT
+      /usr/bin/hdiutil attach -readonly -nobrowse -mountpoint "$amp_mount" ${ampDesktopDmg} >/dev/null
+      /usr/bin/ditto "$amp_mount/Amp.app" /Applications/Amp.app
+      cleanup_amp_mount
+      trap - EXIT
+    fi
+
     /usr/bin/install -d -o root -g wheel -m 0755 "/Library/Application Support/Google"
     /usr/bin/install -d -o root -g wheel -m 0755 "/Library/Application Support/Google/Chrome"
     /usr/bin/install -d -o root -g wheel -m 0755 "/Library/Application Support/Google/Chrome/External Extensions"
