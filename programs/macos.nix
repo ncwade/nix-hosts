@@ -25,7 +25,7 @@ in
       show-recents = false;
       persistent-apps = [
         "/System/Applications/Music.app"
-        "/Applications/Orion.app"
+        "/Applications/Safari.app"
         "/Applications/1Password.app"
         "/Applications/Zed.app"
         "/Applications/Amp.app"
@@ -36,7 +36,6 @@ in
         "/System/Applications/Calendar.app"
         "/System/Applications/System Settings.app"
         "/Applications/Signal.app"
-        "Users/ncwade/Applications/Orion/WebApps/Kagi Assistant.app"
       ];
     };
     finder = {

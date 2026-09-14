@@ -35,7 +35,6 @@
       "google-chrome"
       "microsoft-edge"
       "notion"
-      "orion"
       "postman"
       "rectangle-pro"
       "signal"
