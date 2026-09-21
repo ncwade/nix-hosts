@@ -27,7 +27,6 @@
       "beyond-compare"
       "chatgpt"
       "datagrip"
-      "docker-desktop"
       "firefox"
       # The current nixpkgs source hash is stale, so this derivation cannot build.
       "font-jetbrains-mono"
