@@ -3,10 +3,10 @@
   homebrew = {
     enable = true;
     onActivation = {
-      # Keep routine darwin-rebuild runs fast; do explicit brew maintenance separately.
+      # Refresh Homebrew and upgrade managed packages on each rebuild activation.
       cleanup = "none";
-      autoUpdate = false;
-      upgrade = false;
+      autoUpdate = true;
+      upgrade = true;
     };
     taps = [
       "chainguard-dev/tap"
