@@ -87,7 +87,17 @@
         ];
       };
 
-      darwinConfigurations."luna" = mkDarwinHost "luna" { };
+      # Personal wiki is opt-in per device, never part of a shared user profile.
+      darwinConfigurations."luna" = mkDarwinHost "luna" {
+        extraModules = [
+          {
+            home-manager.users.ncwade.programs.personalWiki = {
+              enable = true;
+              remote = "https://github.com/ncwade/personal-wiki.git";
+            };
+          }
+        ];
+      };
       darwinConfigurations."retired-work-mac" = mkDarwinHost "retired-work-mac" { };
       darwinConfigurations."work-mac" = mkDarwinHost "work-mac" {
         username = "workuser";
