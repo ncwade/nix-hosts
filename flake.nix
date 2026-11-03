@@ -91,6 +91,7 @@
       darwinConfigurations."luna" = mkDarwinHost "luna" {
         extraModules = [
           {
+            homebrew.casks = [ "discord" ];
             home-manager.users.ncwade.programs.personalWiki = {
               enable = true;
               remote = "https://github.com/ncwade/personal-wiki.git";
