@@ -9,6 +9,8 @@
     nix-darwin.inputs.nixpkgs.follows = "nixpkgs";
     disko.url = "github:nix-community/disko";
     disko.inputs.nixpkgs.follows = "nixpkgs";
+    rex.url = "https://pkgs.superlogical.com/rex/nix/preview.tar.gz";
+    rex.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs =
@@ -92,6 +94,10 @@
         extraModules = [
           {
             homebrew.casks = [ "discord" ];
+            home-manager.users.ncwade.imports = [
+              inputs.rex.homeManagerModules.default
+              ./programs/rex.nix
+            ];
             home-manager.users.ncwade.programs.personalWiki = {
               enable = true;
               remote = "https://github.com/ncwade/personal-wiki.git";
