@@ -8,7 +8,6 @@
 {
   imports = [
     ../programs/homebrew.nix
-    ../programs/ssh.nix
   ];
   nix.enable = false;
   system.stateVersion = 4;

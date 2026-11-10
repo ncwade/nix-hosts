@@ -7,8 +7,6 @@
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
     nix-darwin.url = "github:LnL7/nix-darwin";
     nix-darwin.inputs.nixpkgs.follows = "nixpkgs";
-    disko.url = "github:nix-community/disko";
-    disko.inputs.nixpkgs.follows = "nixpkgs";
     rex.url = "https://pkgs.superlogical.com/rex/nix/preview.tar.gz";
     rex.inputs.nixpkgs.follows = "nixpkgs";
   };
@@ -19,21 +17,14 @@
       nixpkgs,
       nix-darwin,
       home-manager,
-      disko,
       ...
     }@inputs:
     let
-      system = "aarch64-darwin";
       linuxSystem = "aarch64-linux";
-      serverSystem = "x86_64-linux";
-      pkgs = import nixpkgs {
-        inherit system;
-      };
       linuxPkgs = import nixpkgs {
         system = linuxSystem;
         config.allowUnfree = true;
       };
-      corpUbuntuVm = pkgs.callPackage ./packages/corp-ubuntu-vm.nix {};
       mkDarwinHost =
         hostname:
         {
@@ -61,21 +52,6 @@
         };
     in
     {
-      packages.${system} = {
-        corp-ubuntu-vm = corpUbuntuVm;
-      };
-      apps.${system} = {
-        corp-ubuntu-vm = {
-          type = "app";
-          program = "${corpUbuntuVm}/bin/corp-ubuntu-vm";
-        };
-      };
-      homeConfigurations.corp-ubuntu-vm = home-manager.lib.homeManagerConfiguration {
-        pkgs = linuxPkgs;
-        modules = [
-          ./home-manager/corp-ubuntu-vm.nix
-        ];
-      };
       homeConfigurations.mvm = home-manager.lib.homeManagerConfiguration {
         pkgs = linuxPkgs;
         modules = [
@@ -105,15 +81,6 @@
         homeManagerModule = ./home-manager/ncwade-cli.nix;
         macosModule = ./programs/macos-cli.nix;
         extraModules = [ ./programs/homebrew-cli.nix ];
-      };
-
-      nixosConfigurations.retired-router = nixpkgs.lib.nixosSystem {
-        system = serverSystem;
-        specialArgs = inputs;
-        modules = [
-          disko.nixosModules.disko
-          ./hosts/retired-router.nix
-        ];
       };
     };
 }
