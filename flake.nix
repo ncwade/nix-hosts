@@ -9,6 +9,7 @@
     nix-darwin.inputs.nixpkgs.follows = "nixpkgs";
     rex.url = "https://pkgs.superlogical.com/rex/nix/preview.tar.gz";
     rex.inputs.nixpkgs.follows = "nixpkgs";
+    defense-unicorns.url = "git+ssh://git@github.com/ncwade/nix-config-defense-unicorns.git?ref=main";
   };
 
   outputs =
@@ -17,6 +18,7 @@
       nixpkgs,
       nix-darwin,
       home-manager,
+      defense-unicorns,
       ...
     }@inputs:
     let
@@ -25,29 +27,44 @@
         system = linuxSystem;
         config.allowUnfree = true;
       };
+      darwinProfiles = {
+        desktop = {
+          homeManagerModule = ./home-manager/ncwade.nix;
+          macosModule = ./programs/macos.nix;
+          extraModules = [ ];
+        };
+        cli = {
+          homeManagerModule = ./home-manager/ncwade-cli.nix;
+          macosModule = ./programs/macos-cli.nix;
+          extraModules = [ ./programs/homebrew-cli.nix ];
+        };
+      };
       mkDarwinHost =
         hostname:
         {
           extraModules ? [ ],
-          homeManagerModule ? ./home-manager/ncwade.nix,
-          macosModule ? ./programs/macos.nix,
+          profile ? "desktop",
           username ? "ncwade",
         }:
+        let
+          hostProfile = darwinProfiles.${profile};
+        in
         nix-darwin.lib.darwinSystem {
           specialArgs = inputs // {
             inherit username;
           };
           modules = [
             ./hosts/nix-darwin.nix
-            macosModule
+            hostProfile.macosModule
             home-manager.darwinModules.home-manager
             {
               home-manager.useGlobalPkgs = true;
               home-manager.useUserPackages = true;
               home-manager.verbose = true;
-              home-manager.users.${username} = import homeManagerModule;
+              home-manager.users.${username} = import hostProfile.homeManagerModule;
             }
           ]
+          ++ hostProfile.extraModules
           ++ extraModules;
         };
     in
@@ -60,27 +77,23 @@
       };
 
       # Personal wiki is opt-in per device, never part of a shared user profile.
-      darwinConfigurations."luna" = mkDarwinHost "luna" {
-        extraModules = [
-          {
-            homebrew.casks = [ "discord" ];
-            home-manager.users.ncwade.imports = [
-              inputs.rex.homeManagerModules.default
-              ./programs/rex.nix
-            ];
-            home-manager.users.ncwade.programs.personalWiki = {
-              enable = true;
-              remote = "https://github.com/ncwade/personal-wiki.git";
-            };
-          }
-        ];
-      };
-      darwinConfigurations."retired-work-mac" = mkDarwinHost "retired-work-mac" { };
-      darwinConfigurations."work-mac" = mkDarwinHost "work-mac" {
-        username = "workuser";
-        homeManagerModule = ./home-manager/ncwade-cli.nix;
-        macosModule = ./programs/macos-cli.nix;
-        extraModules = [ ./programs/homebrew-cli.nix ];
-      };
+      darwinConfigurations = {
+        luna = mkDarwinHost "luna" {
+          extraModules = [
+            {
+              homebrew.casks = [ "discord" ];
+              home-manager.users.ncwade.imports = [
+                inputs.rex.homeManagerModules.default
+                ./programs/rex.nix
+                defense-unicorns.homeManagerModules.default
+              ];
+              home-manager.users.ncwade.programs.personalWiki = {
+                enable = true;
+                remote = "https://github.com/ncwade/personal-wiki.git";
+              };
+            }
+          ];
+        };
+      } // builtins.mapAttrs mkDarwinHost defense-unicorns.lib.darwinHosts;
     };
 }

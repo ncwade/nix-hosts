@@ -1,5 +1,21 @@
 {
   "nodes": {
+    "defense-unicorns": {
+      "locked": {
+        "lastModified": 1794329011,
+        "narHash": "sha256-IxY8fU1ZQ+Ps4Wk+hpHensFzE4xPXt/gxVyiDQmWayw=",
+        "ref": "main",
+        "rev": "9bcfe5f037324769c190b84d272262b8fcef7f36",
+        "revCount": 1,
+        "type": "git",
+        "url": "ssh://git@github.com/ncwade/nix-config-defense-unicorns.git"
+      },
+      "original": {
+        "ref": "main",
+        "type": "git",
+        "url": "ssh://git@github.com/ncwade/nix-config-defense-unicorns.git"
+      }
+    },
     "home-manager": {
       "inputs": {
         "nixpkgs": [
@@ -75,6 +91,7 @@
     },
     "root": {
       "inputs": {
+        "defense-unicorns": "defense-unicorns",
         "home-manager": "home-manager",
         "nix-darwin": "nix-darwin",
         "nixpkgs": "nixpkgs",
