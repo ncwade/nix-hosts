@@ -259,6 +259,20 @@ From Luna, verify access with:
 rex -S https://tycho.tailf3d82.ts.net:7297 whoami --json
 ```
 
+Luna's Rex app has a connected remote host named **Tycho**. To recreate it,
+choose **Add Remote Host**, enter `https://tycho.tailf3d82.ts.net:7297`, and connect.
+Right-click the host in the sidebar, choose **Edit Host**, set **Name** to
+`Tycho`, and save. Rex stores this app preference locally on the Mac; it is not
+part of the NixOS configuration.
+
+The CLI host alias is separate from the app's sidebar entry. It is also configured
+on Luna and can be recreated on another machine with:
+
+```sh
+rex hosts add Tycho https://tycho.tailf3d82.ts.net:7297
+rex -S Tycho whoami --json
+```
+
 On Tycho, inspect `systemctl status rex-login-server rex-tailscale-serve` and
 `tailscale serve status`. Rex's mapping uses port 7297 so the library's Serve
 mapping on 443 can coexist. No application HTTPS firewall ports are opened.
