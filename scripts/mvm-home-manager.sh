@@ -3,7 +3,7 @@ set -euo pipefail
 
 # This script is invoked by mvm while it provisions its golden base. The Nix
 # source below is a staged local Git flake, so keep this repository trusted.
-flake='git+file:///Users/ncwade/src/github.com/ncwade/nix-config#homeConfigurations.mvm.activationPackage'
+flake='git+file:///Users/ncwade/src/github.com/ncwade/nix-hosts#homeConfigurations.mvm.activationPackage'
 generation="$HOME/.local/state/mvm-home-manager/generation"
 
 if [ ! -x /nix/var/nix/profiles/default/bin/nix ]; then

@@ -1,6 +1,6 @@
 # Employer configuration flakes
 
-Shared Darwin desktop and CLI profiles live in this repository. Employer host
+Shared Home Manager profiles live in `ncwade/nix-dotfiles`; this repository assembles the Darwin desktop and CLI machine profiles. Employer host
 names, local user names, Git identity rules, and employer-specific modules live
 in private repositories under `ncwade`.
 
@@ -39,8 +39,7 @@ nix flake check --no-build --all-systems
 ```
 
 Commit the resulting `flake.lock` change. Roll back an employer update by
-restoring the prior lock-file revision. Reverting the initial migration commit
-restores the former inline configuration.
+restoring the prior lock-file revision. The employer repository retains the authoritative employer settings; old anonymized parent history is not a source for restoring those details.
 
 The employer flake has no dependency on this parent, avoiding circular inputs.
 Additional employer flakes can export the same interface and be composed into
@@ -50,5 +49,4 @@ Additional employer flakes can export the same interface and be composed into
 
 The input URL and pinned revision remain visible in this repository. Employer
 configuration is fetched into the local Nix store, so private repositories are
-not a mechanism for storing secret credentials. The split does not erase old
-host names or email addresses from this repository's Git history.
+not a mechanism for storing secret credentials. This repository imports only the cleaned machine history. GitHub-held references in the former `nix-config` repository are separate from this repository.

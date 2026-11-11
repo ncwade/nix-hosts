@@ -1,5 +1,5 @@
 {
-  description = "My dotfiles flake";
+  description = "Machine configurations assembled from private user and employer flakes";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -7,8 +7,8 @@
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
     nix-darwin.url = "github:LnL7/nix-darwin";
     nix-darwin.inputs.nixpkgs.follows = "nixpkgs";
-    rex.url = "https://pkgs.superlogical.com/rex/nix/preview.tar.gz";
-    rex.inputs.nixpkgs.follows = "nixpkgs";
+    nix-dotfiles.url = "git+ssh://git@github.com/ncwade/nix-dotfiles.git?ref=main";
+    nix-dotfiles.inputs.nixpkgs.follows = "nixpkgs";
     defense-unicorns.url = "git+ssh://git@github.com/ncwade/nix-config-defense-unicorns.git?ref=main";
   };
 
@@ -18,6 +18,7 @@
       nixpkgs,
       nix-darwin,
       home-manager,
+      nix-dotfiles,
       defense-unicorns,
       ...
     }@inputs:
@@ -29,12 +30,12 @@
       };
       darwinProfiles = {
         desktop = {
-          homeManagerModule = ./home-manager/ncwade.nix;
+          homeManagerModule = nix-dotfiles.homeManagerModules.desktop;
           macosModule = ./programs/macos.nix;
           extraModules = [ ];
         };
         cli = {
-          homeManagerModule = ./home-manager/ncwade-cli.nix;
+          homeManagerModule = nix-dotfiles.homeManagerModules.cli;
           macosModule = ./programs/macos-cli.nix;
           extraModules = [ ./programs/homebrew-cli.nix ];
         };
@@ -61,7 +62,7 @@
               home-manager.useGlobalPkgs = true;
               home-manager.useUserPackages = true;
               home-manager.verbose = true;
-              home-manager.users.${username} = import hostProfile.homeManagerModule;
+              home-manager.users.${username} = hostProfile.homeManagerModule;
             }
           ]
           ++ hostProfile.extraModules
@@ -72,7 +73,8 @@
       homeConfigurations.mvm = home-manager.lib.homeManagerConfiguration {
         pkgs = linuxPkgs;
         modules = [
-          ./home-manager/mvm.nix
+          nix-dotfiles.homeManagerModules.mvm
+          ./hosts/mvm-home.nix
         ];
       };
 
@@ -83,8 +85,7 @@
             {
               homebrew.casks = [ "discord" ];
               home-manager.users.ncwade.imports = [
-                inputs.rex.homeManagerModules.default
-                ./programs/rex.nix
+                nix-dotfiles.homeManagerModules.rex
                 defense-unicorns.homeManagerModules.default
               ];
               home-manager.users.ncwade.programs.personalWiki = {

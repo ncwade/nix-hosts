@@ -56,6 +56,28 @@
         "type": "github"
       }
     },
+    "nix-dotfiles": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ],
+        "rex": "rex"
+      },
+      "locked": {
+        "lastModified": 1794412356,
+        "narHash": "sha256-gIAoi4++iFGf14G6oZX46Ep8D5PKtCYLFtJKpjYYuaM=",
+        "ref": "main",
+        "rev": "d890f706061f8baf227abaeb0133aebc415eaa1c",
+        "revCount": 50,
+        "type": "git",
+        "url": "ssh://git@github.com/ncwade/nix-dotfiles.git"
+      },
+      "original": {
+        "ref": "main",
+        "type": "git",
+        "url": "ssh://git@github.com/ncwade/nix-dotfiles.git"
+      }
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1793540411,
@@ -75,6 +97,7 @@
     "rex": {
       "inputs": {
         "nixpkgs": [
+          "nix-dotfiles",
           "nixpkgs"
         ]
       },
@@ -94,8 +117,8 @@
         "defense-unicorns": "defense-unicorns",
         "home-manager": "home-manager",
         "nix-darwin": "nix-darwin",
-        "nixpkgs": "nixpkgs",
-        "rex": "rex"
+        "nix-dotfiles": "nix-dotfiles",
+        "nixpkgs": "nixpkgs"
       }
     }
   },
