@@ -3,6 +3,8 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    rex.url = "https://pkgs.superlogical.com/rex/nix/preview/0.1.0-preview.12.tar.gz";
+    rex.inputs.nixpkgs.follows = "nixpkgs";
     home-manager.url = "github:nix-community/home-manager";
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
     nix-darwin.url = "github:LnL7/nix-darwin";
@@ -16,6 +18,7 @@
     {
       self,
       nixpkgs,
+      rex,
       nix-darwin,
       home-manager,
       nix-dotfiles,
@@ -23,6 +26,18 @@
       ...
     }@inputs:
     let
+      tychoSystem = nixpkgs.lib.nixosSystem {
+        system = "x86_64-linux";
+        modules = [
+          rex.nixosModules.default
+          ./hosts/tycho
+        ];
+      };
+      tychoInstaller = nixpkgs.lib.nixosSystem {
+        system = "x86_64-linux";
+        specialArgs = { inherit tychoSystem; };
+        modules = [ ./installer/tycho.nix ];
+      };
       linuxSystem = "aarch64-linux";
       linuxPkgs = import nixpkgs {
         system = linuxSystem;
@@ -70,6 +85,12 @@
         };
     in
     {
+      nixosConfigurations.tycho = tychoSystem;
+      nixosConfigurations.tycho-installer = tychoInstaller;
+      packages = nixpkgs.lib.genAttrs [ "aarch64-darwin" "x86_64-linux" ] (_: {
+        tycho-iso = tychoInstaller.config.system.build.isoImage;
+      });
+
       homeConfigurations.mvm = home-manager.lib.homeManagerConfiguration {
         pkgs = linuxPkgs;
         modules = [
@@ -95,6 +116,7 @@
             }
           ];
         };
-      } // builtins.mapAttrs mkDarwinHost defense-unicorns.lib.darwinHosts;
+      }
+      // builtins.mapAttrs mkDarwinHost defense-unicorns.lib.darwinHosts;
     };
 }

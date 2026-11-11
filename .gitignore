@@ -1,6 +1,7 @@
 configuration.nix
 .vagrant
 result
+artifacts/
 .terraform/
 .tofu/
 *.tfstate

@@ -5,7 +5,34 @@ Private machine configuration assembled from:
 - [nix-dotfiles](https://github.com/ncwade/nix-dotfiles): Home Manager profiles, user programs, skills, and wiki integration.
 - [nix-config-defense-unicorns](https://github.com/ncwade/nix-config-defense-unicorns): employer host definitions and Git identity rules.
 
-This repository owns nix-darwin, system preferences, Homebrew, per-machine accounts, and provisioning. Both private Git inputs select `main` and are pinned to exact commits in `flake.lock`; access to them is required for a fresh evaluation.
+This repository owns NixOS, nix-darwin, system preferences, Homebrew, per-machine accounts, and provisioning. Both private Git inputs select `main` and are pinned to exact commits in `flake.lock`; access to them is required for a fresh evaluation of configurations that use them.
+
+## Tycho personal server
+
+`nixosConfigurations.tycho` manages the Framework Desktop (Ryzen AI Max+ 395,
+64 GB RAM, 1 TB NVMe). It includes Tailscale and an Audiobookshelf service backed
+by a TrueNAS NFS export. The library stays disabled until the export is configured.
+
+Build its dedicated USB installer on this Mac using the existing Docker Desktop
+Linux environment (avoids case-sensitivity problems in the Mac's Nix store):
+
+```console
+bash scripts/build-tycho-iso-docker.sh
+```
+
+Flash `artifacts/tycho/tycho-installer-x86_64.iso` to USB and boot with Ethernet
+connected. The live environment accepts Luna's 1Password SSH key at
+`nixos@tycho-installer.local`. From Luna, start installation with:
+
+```console
+ssh -t nixos@tycho-installer.local 'sudo tmux new-session -A -s tycho-install install-tycho'
+```
+
+It asks you to choose and confirm erasing the NVMe, installs the bundled system,
+and prompts for your account password. After shutdown, remove the USB and power
+on, then connect to `ncwade@tycho.local`. Secure Boot must already be disabled;
+firmware changes can still require a temporary display. See the [installation and setup guide](docs/tycho.md)
+for tailnet enrollment, TrueNAS activation, backups, and rebuilds.
 
 ## Use
 
