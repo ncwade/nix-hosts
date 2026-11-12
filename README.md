@@ -34,6 +34,14 @@ on, then connect to `ncwade@tycho.local`. Secure Boot must already be disabled;
 firmware changes can still require a temporary display. See the [installation and setup guide](docs/tycho.md)
 for tailnet enrollment, TrueNAS activation, backups, and rebuilds.
 
+## nas1 NAS migration
+
+`nixosConfigurations.nas1` runs the NAS on its existing 16 GB boot device.
+The five data drives are preserved, and only `/mnt/Data/documents` is mounted
+and shared at `smb://nas1/docs`. The existing rsync.net backup runs daily at
+midnight Central. See the [migration and recovery guide](docs/nas1.md) for
+preservation checks, operation, and recovery.
+
 ## Use
 
 ```console

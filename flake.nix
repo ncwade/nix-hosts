@@ -5,6 +5,8 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     rex.url = "https://pkgs.superlogical.com/rex/nix/preview/0.1.0-preview.12.tar.gz";
     rex.inputs.nixpkgs.follows = "nixpkgs";
+    disko.url = "github:nix-community/disko";
+    disko.inputs.nixpkgs.follows = "nixpkgs";
     home-manager.url = "github:nix-community/home-manager";
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
     nix-darwin.url = "github:LnL7/nix-darwin";
@@ -19,6 +21,7 @@
       self,
       nixpkgs,
       rex,
+      disko,
       nix-darwin,
       home-manager,
       nix-dotfiles,
@@ -86,6 +89,14 @@
     in
     {
       nixosConfigurations.tycho = tychoSystem;
+      nixosConfigurations.nas1 = nixpkgs.lib.nixosSystem {
+        system = "x86_64-linux";
+        modules = [
+          rex.nixosModules.default
+          disko.nixosModules.disko
+          ./hosts/nas1
+        ];
+      };
       nixosConfigurations.tycho-installer = tychoInstaller;
       packages = nixpkgs.lib.genAttrs [ "aarch64-darwin" "x86_64-linux" ] (_: {
         tycho-iso = tychoInstaller.config.system.build.isoImage;
