@@ -11,6 +11,7 @@ let
     }).config;
   service = ready.systemd.services.audiobookshelf;
   mount = ready.fileSystems."/srv/books";
+  documents = bootstrap.fileSystems."/mnt/nas1/docs";
   live = installer.config;
 in
 assert bootstrap.networking.hostName == "tycho";
@@ -27,6 +28,27 @@ assert bootstrap.services.rex.loginServer.tailscaleServe.httpsPort == 7297;
 assert bootstrap.services.rex.loginServer.extraListen == [ ];
 assert !bootstrap.services.audiobookshelf.enable;
 assert !(bootstrap.fileSystems ? "/srv/books");
+assert documents.device == "//192.168.3.63/docs";
+assert documents.fsType == "cifs";
+assert bootstrap.boot.supportedFilesystems.cifs;
+assert builtins.elem host.pkgs.cifs-utils bootstrap.system.fsPackages;
+assert builtins.all (option: builtins.elem option documents.options) [
+  "credentials=/var/lib/samba/credentials/nas1-docs"
+  "vers=3.1.1"
+  "uid=ncwade"
+  "gid=users"
+  "forceuid"
+  "forcegid"
+  "file_mode=0600"
+  "dir_mode=0700"
+  "nosuid"
+  "nodev"
+  "noexec"
+  "_netdev"
+  "nofail"
+  "x-systemd.automount"
+  "x-systemd.mount-timeout=30s"
+];
 assert bootstrap.networking.firewall.allowedTCPPorts == [ 22 ];
 assert bootstrap.networking.firewall.interfaces.tailscale0.allowedTCPPorts == [ 22 ];
 assert !bootstrap.services.openssh.settings.PasswordAuthentication;

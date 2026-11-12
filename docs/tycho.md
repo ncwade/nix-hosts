@@ -29,8 +29,69 @@ are enabled and running, with no failed system services at verification.
 - Audiobookshelf for audiobooks and basic ebook reading. Media lives at
   `/srv/books` on TrueNAS; its database, metadata, and progress live locally at
   `/var/lib/audiobookshelf` and need a separate backup.
-- TrueNAS is offline, so `personal.books.nfsSource = null` keeps the mount and
-  application disabled. No NAS address, export, or tailnet credentials are invented.
+- NAS1's existing SMB documents share mounts on demand at `/mnt/nas1/docs`,
+  after provisioning the credential described below.
+- `personal.books.nfsSource = null` keeps the separate NFS book library and
+  application disabled until a dedicated export is configured.
+
+## NAS1 documents share
+
+Activated on Tycho on 2026-11-12. The live CIFS mount and a temporary-file
+write/read/delete check passed as `ncwade`. The credential is provisioned on
+Tycho with mode `0600`, owned by `root:root`; its value is not in this repository.
+
+`hosts/tycho/nas1.nix` mounts `//192.168.3.63/docs` at `/mnt/nas1/docs` using
+SMB 3.1.1. This is NAS1's existing documents share, not the optional `/srv/books`
+NFS library. The address is NAS1's last verified LAN DHCP lease; reserve it in
+the router or update the source if the lease changes.
+
+The mount is read/write for `ncwade`, with local file/directory modes `0600` and
+`0700`. NAS1 still checks access using its existing `docs` account. Accessing
+the directory triggers the mount; it unmounts after five idle minutes. Boot
+does not require NAS1 or a working credential, and mount attempts time out
+after 30 seconds. Programs accessing the share can still wait or fail during
+a network outage.
+
+Provision the credential **on Tycho** before first access:
+
+```sh
+sudo install -d -m 0700 -o root -g root /var/lib/samba/credentials
+sudo sh -c 'umask 077; touch /var/lib/samba/credentials/nas1-docs'
+sudo chown root:root /var/lib/samba/credentials/nas1-docs
+sudo chmod 0600 /var/lib/samba/credentials/nas1-docs
+sudoedit /var/lib/samba/credentials/nas1-docs
+```
+
+Enter these two lines, replacing the placeholder with the existing SMB password:
+
+```ini
+username=docs
+password=<existing docs password>
+```
+
+Do not put the credential in this checkout or use `environment.etc.*.text` for
+it: that would copy the password into the Nix store. The runtime file survives
+rebuilds but must be provisioned again on a fresh installation.
+
+Sync the updated source to `/etc/nixos`, then activate and verify on Tycho:
+
+```sh
+sudo nixos-rebuild switch --flake path:/etc/nixos#tycho
+systemctl status mnt-nas1-docs.automount
+ls /mnt/nas1/docs
+findmnt -t cifs --mountpoint /mnt/nas1/docs
+```
+
+Run `ls` as `ncwade` to check ordinary user access. After correcting a password
+or restoring NAS1 connectivity, retry access; if the mount remains failed, run
+`sudo systemctl reset-failed mnt-nas1-docs.mount` first. Inspect mount failures
+with `journalctl -u mnt-nas1-docs.mount`.
+
+Validate the repository configuration without connecting to either host:
+
+```sh
+nix eval --impure --json --expr 'let f = builtins.getFlake ("path:" + toString ./.); in import ./tests/tycho.nix { host = f.nixosConfigurations.tycho; installer = f.nixosConfigurations.tycho-installer; }'
+```
 
 ## Build and flash the USB
 

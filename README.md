@@ -12,6 +12,9 @@ This repository owns NixOS, nix-darwin, system preferences, Homebrew, per-machin
 `nixosConfigurations.tycho` manages the Framework Desktop (Ryzen AI Max+ 395,
 64 GB RAM, 1 TB NVMe). It includes Tailscale and an Audiobookshelf service backed
 by a TrueNAS NFS export. The library stays disabled until the export is configured.
+NAS1's existing SMB documents share mounts on demand at `/mnt/nas1/docs` for
+`ncwade`; provision its runtime credential before use as described in the
+[Tycho setup guide](docs/tycho.md#nas1-documents-share).
 
 Build its dedicated USB installer on this Mac using the existing Docker Desktop
 Linux environment (avoids case-sensitivity problems in the Mac's Nix store):

@@ -9,6 +9,7 @@
   imports = [
     ./hardware.nix
     ./books.nix
+    ./nas1.nix
     ./rex.nix
   ];
 
@@ -68,8 +69,8 @@
   };
   networking.firewall.interfaces.${config.services.tailscale.interfaceName}.allowedTCPPorts = [ 22 ];
 
-  # TrueNAS is currently offline. Set its verified NFSv4 export when available,
-  # for example "192.168.1.10:/mnt/tank/books". Null keeps the library disabled.
+  # NAS1's documents share uses SMB (nas1.nix). The separate book library
+  # remains disabled until a dedicated NFS export is configured.
   personal.books.nfsSource = null;
 
   # Use these numeric IDs for the dedicated books owner on TrueNAS, or change
