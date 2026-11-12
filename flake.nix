@@ -115,7 +115,10 @@
         luna = mkDarwinHost "luna" {
           extraModules = [
             {
-              homebrew.casks = [ "discord" ];
+              homebrew.casks = [
+                "discord"
+                "steam"
+              ];
               home-manager.users.ncwade.imports = [
                 nix-dotfiles.homeManagerModules.rex
                 defense-unicorns.homeManagerModules.default
