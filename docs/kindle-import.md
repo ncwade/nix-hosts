@@ -234,9 +234,10 @@ delete local books when an item disappears from Amazon; downloaded loan copies
 do not automatically expire. Expired or withdrawn access can still prevent a
 download, and those failures are reported instead of counted as imported.
 
-`bookorbit-kindle-sync.service` is configured for an hourly persistent timer
-with up to ten minutes of jitter. The timer is active after the 14:00 CST
-resumption; configuration alone is not proof that the batch completed.
+`bookorbit-kindle-sync.service` is configured for a persistent timer every
+15 minutes, without randomized delay. Runs do not overlap; if the shared media
+lock is busy, that attempt defers until the next scheduled check. This replaces
+the initial hourly schedule with up to ten minutes of jitter.
 It reuses the authenticated device from the successful Mac pilot; the Mac and a browser are not needed for ordinary runs. It does not create
 new device registrations automatically on authentication failure.
 

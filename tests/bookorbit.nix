@@ -16,7 +16,8 @@ assert t.systemd.services.bookorbit-audible.unitConfig.OnFailure == [ "bookorbit
 assert t.systemd.services.bookorbit-kindle.unitConfig.OnFailure == [ "bookorbit-alert-check.service" ];
 assert t.systemd.timers.bookorbit-kindle.timerConfig.Persistent;
 assert t.systemd.timers.bookorbit-kindle-sync.timerConfig.Persistent;
-assert t.systemd.timers.bookorbit-kindle-sync.timerConfig.OnCalendar == "hourly";
+assert t.systemd.timers.bookorbit-kindle-sync.timerConfig.OnCalendar == "*:0/15";
+assert t.systemd.timers.bookorbit-kindle-sync.timerConfig.RandomizedDelaySec == 0;
 assert t.systemd.services.bookorbit-kindle-sync.unitConfig.OnFailure == [ "bookorbit-alert-check.service" ];
 assert lib.hasInfix "/var/lib/bookorbit-kindle/config.json" t.systemd.services.bookorbit-kindle-sync.unitConfig.ConditionPathExists;
 assert t.systemd.services.bookorbit-kindle.serviceConfig.PrivateNetwork;

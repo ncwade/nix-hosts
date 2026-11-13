@@ -59,7 +59,7 @@ in {
     };
     systemd.timers.bookorbit-kindle-sync = {
       wantedBy = [ "timers.target" ];
-      timerConfig = { OnCalendar = "hourly"; RandomizedDelaySec = "10m"; Persistent = true; };
+      timerConfig = { OnCalendar = "*:0/15"; RandomizedDelaySec = 0; Persistent = true; };
     };
   };
 }
