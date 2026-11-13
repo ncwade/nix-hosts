@@ -7,3 +7,5 @@ artifacts/
 *.tfstate
 *.tfstate.*
 *.tfvars
+__pycache__/
+*.py[cod]

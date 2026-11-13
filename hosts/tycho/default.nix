@@ -69,15 +69,6 @@
   };
   networking.firewall.interfaces.${config.services.tailscale.interfaceName}.allowedTCPPorts = [ 22 ];
 
-  # NAS1's documents share uses SMB (nas1.nix). The separate book library
-  # remains disabled until a dedicated NFS export is configured.
-  personal.books.nfsSource = null;
-
-  # Use these numeric IDs for the dedicated books owner on TrueNAS, or change
-  # them here to match that owner before first activation of the library.
-  users.users.audiobookshelf.uid = 2000;
-  users.groups.audiobookshelf.gid = 2000;
-
   environment.systemPackages = with pkgs; [
     curl
     neovim

@@ -16,7 +16,9 @@ are enabled and running, with no failed system services at verification.
 - LAN recovery: `ssh ncwade@tycho.local` using Luna's 1Password key.
 - Tailscale ping and an authenticated Tailscale SSH session from Luna passed.
   The SSH policy requested a browser identity check, which was completed.
-- TrueNAS storage and Audiobookshelf remain disabled pending the real export.
+- The initial installation left Audiobookshelf disabled. Its replacement is
+  [BookOrbit with tsidp and local storage](bookorbit.md); deploy and provision it
+  separately using that guide.
 
 ## What is prepared
 
@@ -26,13 +28,11 @@ are enabled and running, with no failed system services at verification.
   local disk encryption is required; this installer does not set up LUKS.
 - The `ncwade` administrator, key-only OpenSSH over the LAN, Tailscale SSH,
   firmware tooling, SSD trim, and disabled sleep/hibernation.
-- Audiobookshelf for audiobooks and basic ebook reading. Media lives at
-  `/srv/books` on TrueNAS; its database, metadata, and progress live locally at
-  `/var/lib/audiobookshelf` and need a separate backup.
+- BookOrbit for ebooks and audiobooks, with all live data on Tycho's SSD.
+- tsidp for tailnet identity login; encrypted nightly backups to NAS1, then its
+  regular offsite rsync. See [deployment and recovery](bookorbit.md).
 - NAS1's existing SMB documents share mounts on demand at `/mnt/nas1/docs`,
   after provisioning the credential described below.
-- `personal.books.nfsSource = null` keeps the separate NFS book library and
-  application disabled until a dedicated export is configured.
 
 ## NAS1 documents share
 
@@ -41,8 +41,8 @@ write/read/delete check passed as `ncwade`. The credential is provisioned on
 Tycho with mode `0600`, owned by `root:root`; its value is not in this repository.
 
 `hosts/tycho/nas1.nix` mounts `//192.168.3.63/docs` at `/mnt/nas1/docs` using
-SMB 3.1.1. This is NAS1's existing documents share, not the optional `/srv/books`
-NFS library. The address is NAS1's last verified LAN DHCP lease; reserve it in
+SMB 3.1.1. This is NAS1's existing documents share; BookOrbit's `/srv/books`
+library is local to Tycho. The address is NAS1's last verified LAN DHCP lease; reserve it in
 the router or update the source if the lease changes.
 
 The mount is read/write for `ncwade`, with local file/directory modes `0600` and
@@ -228,83 +228,12 @@ The server advertises neither an exit node nor subnet routes. No router port
 forwarding is needed. Tailnet policy should restrict SSH to the administrator
 and HTTPS to the intended library users.
 
-## Activate TrueNAS and the library when the NAS is online
+## BookOrbit, tsidp, and nightly backups
 
-This configuration assumes **NFSv4.2 over the trusted LAN**. If the existing share
-is SMB-only, update the mount for SMB before enabling it; do not paste an SMB path
-into the NFS source. NAS storage does not depend on the tailnet.
-
-1. Reserve Tycho's Ethernet IP in DHCP. On TrueNAS, create or select a books dataset,
-   with `audiobooks` and `ebooks` subdirectories. Configure snapshots and a backup
-   of that dataset; snapshots alone are not an independent backup.
-2. Use a dedicated books owner. The host reserves UID/GID **2000:2000** for
-   `audiobookshelf`. Match these IDs on TrueNAS or change both values in
-   `hosts/tycho/default.nix` before first library activation. Grant this identity
-   directory traversal and read/write access. Do not solve permissions with 777.
-3. Export only this dataset through NFSv4.2, restrict Authorized Hosts to Tycho's
-   reserved LAN address, and enable the NFS service at boot. If using Mapall, map
-   to the dedicated books account, never root. See [TrueNAS NFS setup](https://www.truenas.com/docs/scale/shares/nfs/).
-4. Set the actual source in `hosts/tycho/default.nix`, for example:
-
-   ```nix
-   personal.books.nfsSource = "192.168.1.10:/mnt/tank/books";
-   ```
-
-   That address and dataset are examples, not discovered values. Use the actual
-   export reported by your NAS. Deploy the updated configuration as described below.
-5. On Tycho, verify before creating any library:
-
-   ```sh
-   findmnt /srv/books
-   sudo -u audiobookshelf test -r /srv/books/audiobooks
-   sudo -u audiobookshelf test -w /srv/books/audiobooks
-   sudo -u audiobookshelf test -r /srv/books/ebooks
-   sudo -u audiobookshelf test -w /srv/books/ebooks
-   systemctl status audiobookshelf
-   curl --fail http://127.0.0.1:8000/ping
-   ```
-
-The application requires the NFS mount. If the NAS cannot mount, the server still
-boots and remains manageable, but the application does not start. If the mount is
-removed, the application stops. A mid-session NAS outage may stall reads because
-the mount is `hard`; it will not silently fall back to local storage. Once the NAS
-returns, reads resume. After an initial mount failure, recover with:
-
-```sh
-sudo systemctl reset-failed srv-books.mount audiobookshelf.service
-sudo systemctl start audiobookshelf.service
-```
-
-## Publish the library inside the tailnet
-
-All application access uses Tailscale Serve. Applications bind to localhost or
-Unix sockets; they do not listen directly on LAN/public HTTPS ports. HTTPS ports
-below belong to Tailscale Serve and are reachable only through the tailnet.
-
-Audiobookshelf listens only on loopback. Before sharing it, create its administrator
-account using an SSH tunnel from Luna:
-
-```sh
-ssh -L 8000:127.0.0.1:8000 ncwade@tycho
-```
-
-Open `http://localhost:8000`, set the administrator password, and create libraries
-pointing to `/srv/books/audiobooks` and `/srv/books/ebooks`. Leave **Audiobooks only**
-off for the ebook library. Audiobookshelf offers [basic ebook reading](https://audiobookshelf.org/docs/documentation/libraries/book-library/ebooks/);
-dedicated ebook catalog/conversion workflows may need another service later.
-
-On Tycho, publish HTTPS through [Tailscale Serve](https://tailscale.com/docs/reference/tailscale-cli/serve):
-
-```sh
-sudo tailscale serve --bg --https=443 http://127.0.0.1:8000
-tailscale serve status
-```
-
-Enable MagicDNS/HTTPS in the personal tailnet if prompted. Use the exact HTTPS URL
-shown by Serve for the browser and audiobook clients. Serve's background setting
-persists across reboots. Do not use Funnel: this is a private tailnet service.
-Keep Audiobookshelf accounts enabled for per-user progress and permissions.
-Use scheduled library scans if changes made directly on NFS are not detected.
+See [the BookOrbit guide](bookorbit.md) for local storage, runtime secrets,
+tailnet HTTPS, OIDC setup, NAS1 backup provisioning, and restore procedures.
+BookOrbit has its own `bookorbit.tailf3d82.ts.net` node. Tycho’s port 443 redirects
+to it; Rex remains on Tycho’s port 7297. `http://bookorbit` is a shortcut to HTTPS.
 
 ## Rex remote terminals
 
@@ -358,24 +287,9 @@ sudo nixos-rebuild switch --flake path:/etc/nixos#tycho
 
 For a failed system update, select a previous generation in the boot menu or use
 `sudo nixos-rebuild switch --rollback`. A system rollback does not undo application
-database changes. Keep a stopped-service backup of `/var/lib/audiobookshelf` before
-updating it, in addition to TrueNAS media snapshots. For example, with the NAS mounted
-and a writable `backups/tycho` directory provisioned on that dataset:
+database changes. Follow the [BookOrbit recovery procedure](bookorbit.md#restore-and-rollback)
+for a matching data restore. Never commit application secrets or Tailscale state.
 
-```sh
-mountpoint /srv/books
-sudo systemctl stop audiobookshelf
-sudo -u audiobookshelf rsync -a /var/lib/audiobookshelf/ /srv/books/backups/tycho/audiobookshelf/
-sudo systemctl start audiobookshelf
-```
-
-Snapshot/replicate that backup on TrueNAS; it contains accounts and listening
-progress. Restore with Audiobookshelf stopped and restore its local ownership.
-Test restoring a backup before relying on it. Tailscale state can be recovered by
-re-enrollment; never commit it or authentication secrets to the repository.
-
-Acceptance on the real machine: reboot without USB; verify NVMe/firmware/network
-health, tailnet SSH, a book playback, an EPUB opening, persisted progress after
-another reboot, and behavior while the NAS is unavailable. Confirm that port 8000
-is not reachable directly from the LAN. Building the ISO alone does not prove
-physical boot or access to the currently offline NAS.
+Acceptance on the real machine includes reboot, tailnet SSH, ebook/audio playback,
+persisted progress, Safari and iOS OIDC login, backup restoration, and reading while
+NAS1 is unavailable. Ports 3000 and 5433 must not be reachable from the LAN.

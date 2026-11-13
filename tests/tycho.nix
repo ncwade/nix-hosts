@@ -3,14 +3,6 @@
 { host, installer }:
 let
   bootstrap = host.config;
-  ready =
-    (host.extendModules {
-      modules = [
-        ({ lib, ... }: { personal.books.nfsSource = lib.mkForce "192.0.2.10:/mnt/test/books"; })
-      ];
-    }).config;
-  service = ready.systemd.services.audiobookshelf;
-  mount = ready.fileSystems."/srv/books";
   documents = bootstrap.fileSystems."/mnt/nas1/docs";
   live = installer.config;
 in
@@ -28,6 +20,19 @@ assert bootstrap.services.rex.loginServer.tailscaleServe.httpsPort == 7297;
 assert bootstrap.services.rex.loginServer.extraListen == [ ];
 assert !bootstrap.services.audiobookshelf.enable;
 assert !(bootstrap.fileSystems ? "/srv/books");
+assert bootstrap.personal.bookorbit.enable;
+assert bootstrap.users.users.bookorbit.uid == 2000;
+assert bootstrap.users.groups.bookorbit.gid == 2000;
+assert bootstrap.services.tsidp.enable;
+assert bootstrap.services.tsidp.settings.hostName == "idp";
+assert !bootstrap.services.tsidp.settings.enableFunnel;
+assert !bootstrap.services.tsidp.settings.enableSts;
+assert bootstrap.virtualisation.oci-containers.containers.bookorbit.environment.HOST == "127.0.0.1";
+assert bootstrap.virtualisation.oci-containers.containers.bookorbit.environment.OIDC_ALLOW_LOCAL_ISSUERS == "true";
+assert bootstrap.virtualisation.oci-containers.containers.bookorbit.ports == [];
+assert bootstrap.virtualisation.oci-containers.containers.bookorbit-db.ports == [];
+assert bootstrap.systemd.timers.bookorbit-backup.timerConfig.OnCalendar == "*-*-* 02:00:00 America/Chicago";
+assert builtins.elem "bookorbit-secrets.service" bootstrap.systemd.services.podman-bookorbit.requires;
 assert documents.device == "//192.168.3.63/docs";
 assert documents.fsType == "cifs";
 assert bootstrap.boot.supportedFilesystems.cifs;
@@ -72,23 +77,7 @@ assert builtins.elem "network-online.target" live.systemd.services.avahi-daemon.
 assert builtins.elem "resolvconf.service" live.systemd.services.avahi-daemon.after;
 assert builtins.elem "network-online.target" bootstrap.systemd.services.avahi-daemon.after;
 assert !(builtins.match ".*sudo .*install-tycho.*" live.programs.bash.interactiveShellInit != null);
-assert ready.services.audiobookshelf.enable;
-assert ready.services.audiobookshelf.host == "127.0.0.1";
-assert !ready.services.audiobookshelf.openFirewall;
-assert ready.networking.firewall.allowedTCPPorts == [ 22 ];
-assert ready.services.audiobookshelf.dataDir == "audiobookshelf";
-assert mount.device == "192.0.2.10:/mnt/test/books";
-assert mount.fsType == "nfs";
-assert builtins.elem "hard" mount.options;
-assert builtins.elem "nofail" mount.options;
-assert builtins.elem "noauto" mount.options;
-assert service.unitConfig.RequiresMountsFor == [ "/srv/books" ];
-assert builtins.elem "srv-books.mount" service.bindsTo;
-assert builtins.elem "srv-books.mount" service.after;
-assert ready.users.users.audiobookshelf.uid == 2000;
-assert ready.users.groups.audiobookshelf.gid == 2000;
 {
-  # Force complete system evaluation, including NixOS assertions in both modes.
+  # Force complete system evaluation, including NixOS assertions.
   bootstrap = bootstrap.system.build.toplevel.drvPath;
-  withStorage = ready.system.build.toplevel.drvPath;
 }

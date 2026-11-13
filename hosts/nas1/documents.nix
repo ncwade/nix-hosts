@@ -103,9 +103,13 @@ in
         NoNewPrivileges = true;
         TimeoutStartSec = "6h";
       };
-      # Preserve the existing rsync task's scope, destination, and deletion policy.
+      # The documents tree includes backups/tycho/bookorbit. Serialize with
+      # incoming restic SFTP sessions so the offsite copy is self-consistent.
+      # Keep the existing midnight cadence, destination, and deletion policy.
       script = ''
-        exec ${pkgs.rsync}/bin/rsync -rt -zz --delay-updates --delete-delay --stats \
+        exec ${pkgs.util-linux}/bin/flock --exclusive --timeout 21600 \
+          /run/lock/nas1-documents-backup.lock \
+          ${pkgs.rsync}/bin/rsync -rt -zz --delay-updates --delete-delay --stats \
           -e "${pkgs.openssh}/bin/ssh -i $CREDENTIALS_DIRECTORY/ssh-key -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$CREDENTIALS_DIRECTORY/known-hosts" \
           ${documents} 3451@usw-s003.rsync.net:truenas/
       '';

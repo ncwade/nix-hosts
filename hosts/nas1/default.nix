@@ -5,6 +5,7 @@
     (modulesPath + "/installer/scan/not-detected.nix")
     ./disk-config.nix
     ./documents.nix
+    ./bookorbit-backup.nix
     ./rex.nix
   ];
 

@@ -1,0 +1,155 @@
+--- upstream/src/kindl/auth.py
++++ pilot/src/kindl/auth.py
+@@ -21,6 +21,7 @@
+ import os as _os
+ import secrets
+ import stat
++import tempfile
+ from collections.abc import Mapping
+ from dataclasses import asdict, dataclass, field
+ from datetime import UTC, datetime
+@@ -423,15 +424,20 @@
+ 
+ 
+ def _write_private_json(path: Path, value: object) -> None:
+-    path.parent.mkdir(parents=True, exist_ok=True)
+-    partial = path.with_name(f"{path.name}.tmp")
++    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
++    parent = path.parent.lstat()
++    if (not stat.S_ISDIR(parent.st_mode) or stat.S_IMODE(parent.st_mode) & 0o077
++            or (os.name == "posix" and parent.st_uid != os.getuid())):
++        raise RuntimeError("Pilot credential directory must be private and owned by this user")
++    descriptor, temporary = tempfile.mkstemp(prefix=".config-", dir=path.parent)
++    partial = Path(temporary)
+     try:
+-        partial.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
++        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
++            json.dump(value, handle, indent=2)
++            handle.write("\n")
++            handle.flush()
++            os.fsync(handle.fileno())
+         partial.replace(path)
+-        try:
+-            path.chmod(stat.S_IRUSR | stat.S_IWUSR)
+-        except OSError:
+-            pass
+     except BaseException:
+         partial.unlink(missing_ok=True)
+         raise
+--- upstream/src/kindl/cli.py
++++ pilot/src/kindl/cli.py
+@@ -1,6 +1,8 @@
+ from __future__ import annotations
+ 
+ import json
++import os
++import getpass
+ import re
+ import sys
+ import webbrowser
+@@ -37,6 +39,34 @@
+ 
+ DEFAULT_FORMAT = "{Author} - {Title} {ASIN}"
+ INVALID_PATH_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
++
++
++def _prompt_callback():
++    if not sys.stdin.isatty():
++        raise click.ClickException("Pilot sign-in requires a private interactive terminal")
++    import termios
++    import warnings
++    # getpass reads the controlling terminal. Disable its canonical line limit
++    # before getpass so a long callback paste cannot silently lose its Return.
++    fd = os.open("/dev/tty", os.O_RDWR | os.O_NOCTTY)
++    original = None
++    try:
++        original = termios.tcgetattr(fd)
++        hidden = original[:]
++        hidden[6] = original[6][:]
++        hidden[3] &= ~(termios.ECHO | termios.ECHONL | termios.ICANON)
++        hidden[6][termios.VMIN] = 1
++        hidden[6][termios.VTIME] = 0
++        termios.tcsetattr(fd, termios.TCSADRAIN, hidden)
++        with warnings.catch_warnings():
++            warnings.simplefilter("error", getpass.GetPassWarning)
++            return getpass.getpass("Final URL (hidden): ").strip()
++    finally:
++        try:
++            if original is not None:
++                termios.tcsetattr(fd, termios.TCSADRAIN, original)
++        finally:
++            os.close(fd)
+ 
+ 
+ @dataclass(slots=True)
+@@ -146,7 +176,7 @@
+     )
+     if not no_browser and not webbrowser.open(url):
+         click.echo(f"Open this URL manually:\n{url}")
+-    final_url = click.prompt("Final URL", prompt_suffix=": ").strip()
++    final_url = _prompt_callback()
+     with AmazonDeviceClient(region=region) as client:
+         credentials = client.register(final_url, verifier, serial, pid)
+     runtime.store.add(Account(name, credentials), replace=replace)
+--- upstream/src/kindl/client.py
++++ pilot/src/kindl/client.py
+@@ -11,6 +11,7 @@
+ from urllib.parse import parse_qs, unquote, urlencode, urlsplit, urlunsplit
+ 
+ import httpx
++from .pilot_guard import check_destination, guard_request, guard_response
+ 
+ from .auth import (
+     APP_NAME,
+@@ -189,7 +190,8 @@
+         )
+         self.http = httpx.Client(
+             timeout=timeout,
+-            follow_redirects=True,
++            follow_redirects=False,
++            event_hooks={"request": [guard_request], "response": [guard_response]},
+             headers={"User-Agent": "Mozilla/5.0"},
+             transport=httpx.HTTPTransport(retries=2),
+         )
+@@ -476,6 +478,7 @@
+         device_metadata: bool = False,
+         include_app_id: bool = False,
+     ) -> dict[str, str]:
++        check_destination(url)
+         if not self.credentials:
+             raise RuntimeError("Device credentials are required")
+         headers = {
+--- upstream/src/kindl/pilot_guard.py
++++ pilot/src/kindl/pilot_guard.py
+@@ -0,0 +1,31 @@
++"""Narrow fail-closed destination policy for the isolated one-book pilot."""
++from urllib.parse import urlsplit
++
++ALLOWED_HOSTS = frozenset({
++    "api.amazon.com", "api.amazon.co.jp",
++    "firs-ta-g7g.amazon.com", "todo-ta-g7g.amazon.com",
++    "kindle-digital-delivery.amazon.com",
++    "cde-ta-g7g.amazon.com",
++})
++
++
++def check_destination(url):
++    try:
++        parsed = urlsplit(str(url))
++        allowed = (parsed.scheme == "https" and parsed.hostname in ALLOWED_HOSTS
++                   and parsed.port in (None, 443) and parsed.username is None
++                   and parsed.password is None and not parsed.fragment)
++    except ValueError:
++        allowed = False
++    if not allowed:
++        # Never print URLs: resource queries can contain signed credentials.
++        raise RuntimeError("Pilot blocked an unreviewed request destination")
++
++
++def guard_request(request):
++    check_destination(request.url)
++
++
++def guard_response(response):
++    if 300 <= response.status_code < 400:
++        raise RuntimeError("Pilot blocked a redirect; review destination before retrying")

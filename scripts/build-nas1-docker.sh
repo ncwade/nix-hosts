@@ -14,7 +14,7 @@ docker run --rm --name nas1-nixos-builder --platform linux/amd64 \
   nixos/nix@sha256:f9823365cb4dbd4f1c056957d94e415b5bae73dfee33cf4da84c98a2f4ce9577 \
   sh -eu -c '
     mkdir /src
-    for entry in flake.nix flake.lock hosts programs scripts installer docs README.md; do
+    for entry in flake.nix flake.lock modules hosts programs scripts installer docs README.md; do
       cp -R "/checkout/$entry" /src/
     done
     export NIX_CONFIG="experimental-features = nix-command flakes"

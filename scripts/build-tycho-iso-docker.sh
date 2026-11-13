@@ -15,7 +15,7 @@ docker run --rm --name tycho-iso-builder --platform linux/amd64 \
   sh -eu -c '
     mkdir /src
     # Stage only source; never ingest .git or a previous ISO into the flake.
-    for entry in flake.nix flake.lock hosts programs scripts installer docs README.md; do
+    for entry in flake.nix flake.lock modules hosts programs scripts installer docs README.md; do
       cp -R "/checkout/$entry" /src/
     done
     nix --extra-experimental-features "nix-command flakes" build \

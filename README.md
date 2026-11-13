@@ -10,8 +10,10 @@ This repository owns NixOS, nix-darwin, system preferences, Homebrew, per-machin
 ## Tycho personal server
 
 `nixosConfigurations.tycho` manages the Framework Desktop (Ryzen AI Max+ 395,
-64 GB RAM, 1 TB NVMe). It includes Tailscale and an Audiobookshelf service backed
-by a TrueNAS NFS export. The library stays disabled until the export is configured.
+64 GB RAM, 1 TB NVMe). It includes Tailscale, BookOrbit, and tsidp. All live book
+and application data stays on Tycho; encrypted nightly backups go to NAS1 and
+are included in NAS1's regular offsite rsync. See the [BookOrbit deployment and
+recovery guide](docs/bookorbit.md) for setup and validation.
 NAS1's existing SMB documents share mounts on demand at `/mnt/nas1/docs` for
 `ncwade`; provision its runtime credential before use as described in the
 [Tycho setup guide](docs/tycho.md#nas1-documents-share).
@@ -35,7 +37,7 @@ It asks you to choose and confirm erasing the NVMe, installs the bundled system,
 and prompts for your account password. After shutdown, remove the USB and power
 on, then connect to `ncwade@tycho.local`. Secure Boot must already be disabled;
 firmware changes can still require a temporary display. See the [installation and setup guide](docs/tycho.md)
-for tailnet enrollment, TrueNAS activation, backups, and rebuilds.
+for tailnet enrollment, backups, and rebuilds.
 
 ## nas1 NAS migration
 

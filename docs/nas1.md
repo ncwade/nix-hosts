@@ -258,3 +258,17 @@ never target one of the five data drives.
 If NixOS has accepted new document writes, reconcile those writes and their
 backup before reverting. An old snapshot is not an appropriate automatic
 rollback target for newer user data.
+
+## BookOrbit backup receiver
+
+`hosts/nas1/bookorbit-backup.nix` creates
+`/mnt/Data/documents/backups/tycho/bookorbit` for Tycho's encrypted restic repository.
+It uses the existing documents dataset, so the unchanged midnight rsync scope
+includes it automatically. Both rsync and incoming SFTP sessions take the same
+exclusive lock to prevent copying a changing repository. The `nas-backup` account
+accepts only forced SFTP for its dedicated Tycho key; provision that public key
+at `/etc/ssh/tycho-bookorbit-backup.pub` (root-owned, 0644).
+
+The 02:00 Tycho backup is copied offsite by the next midnight NAS1 run.
+See [BookOrbit setup and recovery](bookorbit.md) for encryption-key escrow, initial
+repository creation, retention, and restore verification.
