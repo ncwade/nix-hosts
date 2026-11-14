@@ -5,7 +5,8 @@ and OpenZFS 2.4.4. Installation replaced only the existing 16 GB boot device.
 The documents share and daily backup are active and passed a subsequent reboot
 check with no failed services.
 
-Connect over SSH as `root@192.168.3.63` or open `smb://192.168.3.63/docs`
+Connect over SSH as `ncwade@192.168.3.63` and use `sudo` for administration,
+or open `smb://192.168.3.63/docs`
 using the existing `docs` login. The hostname remains `nas1`; use the IP if
 your client has not refreshed its DNS registration. DHCP assigned `192.168.3.63` after installation; the previous
 TrueNAS address was `192.168.3.62`. The original SSH server identity and permanent authorized login key are retained.
@@ -221,9 +222,10 @@ successfully, and was removed after the test.
 
 Only Tailscale identity `ncwade@github` maps to the local `ncwade` account.
 Terminals run as that account; anonymous access and remote root accounts are
-disabled. The account also accepts the existing public SSH key. Set its password
-with `passwd ncwade` from the existing root SSH login before using password-based
-sudo. No passwordless sudo rule is installed.
+disabled. The account also accepts the existing public SSH key. Its local password
+was set and password-based sudo verified on 2026-11-13. Direct root SSH login is
+disabled with `PermitRootLogin = "no"`; connect as `ncwade` and use `sudo` for
+administration. No passwordless sudo rule is installed.
 
 Tailscale Serve publishes the private Rex socket on HTTPS port 7297. The NAS
 keeps its existing DNS configuration with `--accept-dns=false`. Enrollment

@@ -45,7 +45,7 @@
     settings = {
       PasswordAuthentication = false;
       KbdInteractiveAuthentication = false;
-      PermitRootLogin = "prohibit-password";
+      PermitRootLogin = "no";
     };
   };
   # Existing nas1 public login key; private keys never enter the Nix store.
