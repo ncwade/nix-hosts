@@ -1,0 +1,81 @@
+name: home-monitoring
+services:
+  influxdb:
+    image: influxdb:2.9.1@sha256:e4572d094ac3272f06528ea904ce6b4cb3bb19be2db3b3b1acbd27ba5c3a73e2
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      INFLUXD_HTTP_BIND_ADDRESS: 127.0.0.1:8086
+      INFLUXD_REPORTING_DISABLED: "true"
+      INFLUXD_LOG_LEVEL: error
+    volumes:
+      - /var/lib/home-monitoring/influxdb:/var/lib/influxdb2
+      - /var/lib/home-monitoring/influx-config:/etc/influxdb2
+    healthcheck:
+      test: [CMD, influx, ping, --host, 'http://127.0.0.1:8086']
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    logging: &logging
+      driver: json-file
+      options: {max-size: 10m, max-file: '3'}
+  home-assistant:
+    image: ghcr.io/home-assistant/home-assistant:2026.11.1@sha256:6785d1eca68747a524c156faae1b139ed415c07357386ae6fe17291986e59e82
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      TZ: America/Chicago
+    volumes:
+      - /var/lib/home-monitoring/home-assistant:/config
+      - /etc/localtime:/etc/localtime:ro
+    stop_grace_period: 60s
+    healthcheck:
+      test: [CMD, python3, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8123/', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    logging: *logging
+  grafana:
+    image: grafana/grafana:13.3.1@sha256:0615ec4fbd4072004b7d86b46ded63013a74b7d6eb1119273dd89e8fa25c13cf
+    restart: unless-stopped
+    network_mode: host
+    user: '472:472'
+    env_file: /var/lib/home-monitoring/secrets/grafana.env
+    environment:
+      GF_SERVER_HTTP_ADDR: 127.0.0.1
+      GF_SERVER_HTTP_PORT: '3002'
+      GF_SERVER_ROOT_URL: https://grafana.tailf3d82.ts.net
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      GF_AUTH_ANONYMOUS_ENABLED: 'false'
+      GF_AUTH_GENERIC_OAUTH_NAME: Tailscale
+      GF_AUTH_GENERIC_OAUTH_ALLOW_SIGN_UP: 'true'
+      GF_AUTH_GENERIC_OAUTH_AUTO_LOGIN: 'false'
+      GF_AUTH_GENERIC_OAUTH_SCOPES: openid profile email
+      GF_AUTH_GENERIC_OAUTH_AUTH_URL: https://idp.tailf3d82.ts.net/authorize
+      GF_AUTH_GENERIC_OAUTH_TOKEN_URL: https://idp.tailf3d82.ts.net/token
+      GF_AUTH_GENERIC_OAUTH_API_URL: https://idp.tailf3d82.ts.net/userinfo
+      GF_AUTH_GENERIC_OAUTH_USE_PKCE: 'true'
+      GF_AUTH_GENERIC_OAUTH_USE_REFRESH_TOKEN: 'false'
+      GF_AUTH_GENERIC_OAUTH_LOGIN_ATTRIBUTE_PATH: username
+      GF_AUTH_GENERIC_OAUTH_EMAIL_ATTRIBUTE_PATH: email
+      GF_AUTH_GENERIC_OAUTH_NAME_ATTRIBUTE_PATH: name
+      GF_AUTH_GENERIC_OAUTH_GROUPS_ATTRIBUTE_PATH: groups
+      GF_AUTH_GENERIC_OAUTH_ALLOWED_GROUPS: home-monitoring-admin
+      GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH: "contains(groups[*], 'home-monitoring-admin') && username == 'ncwade' && 'Admin'"
+      GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_STRICT: 'true'
+      GF_AUTH_GENERIC_OAUTH_ALLOW_ASSIGN_GRAFANA_ADMIN: 'false'
+      GF_ANALYTICS_REPORTING_ENABLED: 'false'
+      GF_ANALYTICS_CHECK_FOR_UPDATES: 'false'
+      GF_PLUGINS_PREINSTALL_AUTO_UPDATE: 'false'
+      GF_LOG_LEVEL: error
+    volumes:
+      - /var/lib/home-monitoring/grafana:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/etc/grafana/dashboards:ro
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, 'http://127.0.0.1:3002/api/health']
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    logging: *logging

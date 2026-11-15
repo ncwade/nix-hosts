@@ -1,0 +1,1148 @@
+{
+  "uid": "tycho-tcc",
+  "title": "Tycho \u2014 Sitting Room TCC thermostat",
+  "tags": [
+    "home",
+    "tcc",
+    "monitoring-only"
+  ],
+  "timezone": "America/Chicago",
+  "schemaVersion": 39,
+  "version": 2,
+  "refresh": "30s",
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "editable": false,
+  "panels": [
+    {
+      "id": 1,
+      "title": "Monitoring scope and data quality",
+      "type": "text",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 5
+      },
+      "datasource": {
+        "type": "influxdb",
+        "uid": "home-history"
+      },
+      "description": "",
+      "targets": [],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "noValue": "No recent data",
+          "custom": {
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "**Monitoring only \u00b7 America/Chicago \u00b7 5-year retention**\n\nHeating and fan activity were verified during a natural cycle on 2026-11-15. Daily heating estimates count only consecutive, observed idle/heating samples; transitions and gaps count as unknown. Cooling runtime, cycle counts, and cycle duration remain unverified and are omitted. Selected HVAC mode is a setting, not proof of operation. Missing activity is unknown, never idle.\n\nSnapshots every 30 seconds do not add Honeywell polls. **HA report age is not the age of a successful cloud update**: TCC can briefly retain cached values during errors and does not expose a last-success timestamp. An unchanged reading is not itself a failure. Unknown/unavailable states are explicit; gaps are never filled with zero. Current cards use only the last 90 seconds. History retains gaps; coarse time windows may hide brief transitions.\n\nNo energy or fuel consumption is inferred. Indoor and outdoor temperature/humidity are confirmed exposed by the Sitting Room integration. Outdoor readings are Honeywell-reported sensor readings, not a weather-service substitution.\n\nDaily heating panels calculate **up to the last 31 days of the selected range** to keep queries responsive. Select any historical month for older daily totals. Temperature/history panels retain the full selected range."
+      }
+    },
+    {
+      "id": 2,
+      "title": "Indoor temperature",
+      "type": "stat",
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "influxdb",
+        "uid": "home-history"
+      },
+      "description": "No data means unavailable or not exposed. Inactive-mode setpoints are not invented.",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "home-history"
+          },
+          "query": "from(bucket: \"home_history\")\n  |> range(start: -90s)\n  |> filter(fn: (r) => r._measurement == \"home_state\" and r.domain == \"sensor\" and r.entity_id == \"tcc_indoor_temperature\" and r._field == \"value\")\n  |> last()\n  |> keep(columns: [\"_time\", \"_value\"])"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "fahrenheit",
+          "noValue": "No recent data",
+          "custom": {
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "colorMode": "value"
+      }
+    },
+    {
+      "id": 3,
+      "title": "Heating setpoint",
+      "type": "stat",
+      "gridPos": {
+        "x": 6,
+        "y": 5,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "influxdb",
+        "uid": "home-history"
+      },
+      "description": "No data means unavailable or not exposed. Inactive-mode setpoints are not invented.",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "home-history"
+          },
+          "query": "from(bucket: \"home_history\")\n  |> range(start: -90s)\n  |> filter(fn: (r) => r._measurement == \"home_state\" and r.domain == \"sensor\" and r.entity_id == \"tcc_heating_setpoint\" and r._field == \"value\")\n  |> last()\n  |> keep(columns: [\"_time\", \"_value\"])"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "fahrenheit",
+          "noValue": "No recent data",
+          "custom": {
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "colorMode": "value"
+      }
+    },
+    {
+      "id": 4,
+      "title": "Cooling setpoint",
+      "type": "stat",
+      "gridPos": {
+        "x": 12,
+        "y": 5,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "influxdb",
+        "uid": "home-history"
+      },
+      "description": "No data means unavailable or not exposed. Inactive-mode setpoints are not invented.",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "home-history"
+          },
+          "query": "from(bucket: \"home_history\")\n  |> range(start: -90s)\n  |> filter(fn: (r) => r._measurement == \"home_state\" and r.domain == \"sensor\" and r.entity_id == \"tcc_cooling_setpoint\" and r._field == \"value\")\n  |> last()\n  |> keep(columns: [\"_time\", \"_value\"])"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "fahrenheit",
+          "noValue": "No recent data",
+          "custom": {
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "colorMode": "value"
+      }
+    },
+    {
+      "id": 5,
+      "title": "Indoor humidity",
+      "type": "stat",
+      "gridPos": {
+        "x": 18,
+        "y": 5,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "influxdb",
+        "uid": "home-history"
+      },
+      "description": "No data means unavailable or not exposed. Inactive-mode setpoints are not invented.",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "home-history"
+          },
+          "query": "from(bucket: \"home_history\")\n  |> range(start: -90s)\n  |> filter(fn: (r) => r._measurement == \"home_state\" and r.domain == \"sensor\" and r.entity_id == \"tcc_indoor_humidity\" and r._field == \"value\")\n  |> last()\n  |> keep(columns: [\"_time\", \"_value\"])"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "noValue": "No recent data",
+          "custom": {
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "colorMode": "value"
+      }
+    },
+    {
+      "id": 6,
+      "title": "Selected mode",
+      "type": "stat",
+      "gridPos": {
+        "x": 0,
+        "y": 9,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "influxdb",
+        "uid": "home-history"
+      },
+      "description": "",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "home-history"
+          },
+          "query": "from(bucket: \"home_history\")\n  |> range(start: -90s)\n  |> filter(fn: (r) => r._measurement == \"home_state\" and r.domain == \"sensor\" and r.entity_id == \"tcc_selected_mode\" and r._field == \"state\")\n  |> last()\n  |> keep(columns: [\"_time\", \"_value\"])"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "noValue": "No recent data",
+          "custom": {
+            "spanNulls": false
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "unknown_reading": {
+                  "text": "Unknown",
+                  "color": "gray"
+                },
+                "source_unavailable": {
+                  "text": "Unavailable",
+                  "color": "red"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^Value$/",
+          "values": false
+        },
+        "textMode": "auto",
+        "colorMode": "value"
+      }
+    },
+    {
+      "id": 7,
+      "title": "Reported equipment activity",
+      "type": "stat",
+      "gridPos": {
+        "x": 6,
+        "y": 9,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "influxdb",
+        "uid": "home-history"
+      },
+      "description": "Natural idle \u2192 heating/running \u2192 idle transition verified on 2026-11-15. Cooling activity has not been observed.",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "home-history"
+          },
+          "query": "from(bucket: \"home_history\")\n  |> range(start: -90s)\n  |> filter(fn: (r) => r._measurement == \"home_state\" and r.domain == \"sensor\" and r.entity_id == \"tcc_reported_hvac_action\" and r._field == \"state\")\n  |> last()\n  |> keep(columns: [\"_time\", \"_value\"])"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "noValue": "No recent data",
+          "custom": {
+            "spanNulls": false
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "unknown_reading": {
+                  "text": "Unknown",
+                  "color": "gray"
+                },
+                "source_unavailable": {
+                  "text": "Unavailable",
+                  "color": "red"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^Value$/",
+          "values": false
+        },
+        "textMode": "auto",
+        "colorMode": "value"
+      }
+    },
+    {
+      "id": 8,
+      "title": "Fan setting",
+      "type": "stat",
+      "gridPos": {
+        "x": 12,
+        "y": 9,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "influxdb",
+        "uid": "home-history"
+      },
+      "description": "",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "home-history"
+          },
+          "query": "from(bucket: \"home_history\")\n  |> range(start: -90s)\n  |> filter(fn: (r) => r._measurement == \"home_state\" and r.domain == \"sensor\" and r.entity_id == \"tcc_fan_setting\" and r._field == \"state\")\n  |> last()\n  |> keep(columns: [\"_time\", \"_value\"])"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "noValue": "No recent data",
+          "custom": {
+            "spanNulls": false
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "unknown_reading": {
+                  "text": "Unknown",
+                  "color": "gray"
+                },
+                "source_unavailable": {
+                  "text": "Unavailable",
+                  "color": "red"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^Value$/",
+          "values": false
+        },
+        "textMode": "auto",
+        "colorMode": "value"
+      }
+    },
+    {
+      "id": 9,
+      "title": "Reported fan activity",
+      "type": "stat",
+      "gridPos": {
+        "x": 18,
+        "y": 9,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "influxdb",
+        "uid": "home-history"
+      },
+      "description": "Natural idle \u2192 heating/running \u2192 idle transition verified on 2026-11-15. Cooling activity has not been observed.",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "home-history"
+          },
+          "query": "from(bucket: \"home_history\")\n  |> range(start: -90s)\n  |> filter(fn: (r) => r._measurement == \"home_state\" and r.domain == \"sensor\" and r.entity_id == \"tcc_reported_fan_activity\" and r._field == \"state\")\n  |> last()\n  |> keep(columns: [\"_time\", \"_value\"])"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "noValue": "No recent data",
+          "custom": {
+            "spanNulls": false
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "unknown_reading": {
+                  "text": "Unknown",
+                  "color": "gray"
+                },
+                "source_unavailable": {
+                  "text": "Unavailable",
+                  "color": "red"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^Value$/",
+          "values": false
+        },
+        "textMode": "auto",
+        "colorMode": "value"
+      }
+    },
+    {
+      "id": 10,
+      "title": "Temperature and available setpoints",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 13,
+        "w": 24,
+        "h": 8
+      },
+      "datasource": {
+        "type": "influxdb",
+        "uid": "home-history"
+      },
+      "description": "",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "home-history"
+          },
+          "query": "from(bucket: \"home_history\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"home_state\" and r.domain == \"sensor\" and r.entity_id == \"tcc_indoor_temperature\" and r._field == \"value\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: true)\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> set(key: \"_field\", value: \"Indoor\")\n  |> rename(columns: {_value: \"Indoor temperature\"})"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "home-history"
+          },
+          "query": "from(bucket: \"home_history\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"home_state\" and r.domain == \"sensor\" and r.entity_id == \"tcc_heating_setpoint\" and r._field == \"value\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: true)\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> set(key: \"_field\", value: \"Heating setpoint\")\n  |> rename(columns: {_value: \"Heating setpoint\"})"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "home-history"
+          },
+          "query": "from(bucket: \"home_history\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"home_state\" and r.domain == \"sensor\" and r.entity_id == \"tcc_cooling_setpoint\" and r._field == \"value\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: true)\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> set(key: \"_field\", value: \"Cooling setpoint\")\n  |> rename(columns: {_value: \"Cooling setpoint\"})"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "fahrenheit",
+          "noValue": "No recent data",
+          "custom": {
+            "spanNulls": false,
+            "drawStyle": "line",
+            "lineInterpolation": "stepAfter",
+            "lineWidth": 2,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "interval": "30s"
+    },
+    {
+      "id": 11,
+      "title": "Reported heating / cooling activity",
+      "type": "state-timeline",
+      "gridPos": {
+        "x": 0,
+        "y": 21,
+        "w": 24,
+        "h": 6
+      },
+      "datasource": {
+        "type": "influxdb",
+        "uid": "home-history"
+      },
+      "description": "Natural idle \u2192 heating/running \u2192 idle transition verified on 2026-11-15. Cooling activity has not been observed.",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "home-history"
+          },
+          "query": "data = from(bucket: \"home_history\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"home_state\" and r.domain == \"sensor\" and r.entity_id == \"tcc_equipment_activity_code\" and r._field == \"value\")\nobserved = data\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)\n  |> keep(columns: [\"_time\", \"_value\"])\nmissing = data\n  |> aggregateWindow(every: v.windowPeriod, fn: count, createEmpty: true)\n  |> filter(fn: (r) => r._value == 0)\n  |> map(fn: (r) => ({_time: r._time, _value: -1.0}))\nunion(tables: [observed, missing]) |> group() |> sort(columns: [\"_time\"])"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "noValue": "No recent data",
+          "custom": {
+            "spanNulls": false
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "-3": {
+                  "text": "Not discovered / ambiguous",
+                  "color": "gray"
+                },
+                "-2": {
+                  "text": "Unavailable",
+                  "color": "red"
+                },
+                "-1": {
+                  "text": "Unknown / missing sample",
+                  "color": "gray"
+                },
+                "0": {
+                  "text": "Idle",
+                  "color": "green"
+                },
+                "1": {
+                  "text": "Heating",
+                  "color": "orange"
+                },
+                "2": {
+                  "text": "Cooling",
+                  "color": "blue"
+                },
+                "3": {
+                  "text": "Fan only",
+                  "color": "purple"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "mergeValues": true,
+        "showValue": "auto",
+        "rowHeight": 0.9,
+        "alignValue": "left",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "maxDataPoints": 3000,
+      "interval": "30s"
+    },
+    {
+      "id": 12,
+      "title": "Availability reported by Home Assistant",
+      "type": "stat",
+      "gridPos": {
+        "x": 0,
+        "y": 27,
+        "w": 8,
+        "h": 4
+      },
+      "datasource": {
+        "type": "influxdb",
+        "uid": "home-history"
+      },
+      "description": "",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "home-history"
+          },
+          "query": "from(bucket: \"home_history\")\n  |> range(start: -90s)\n  |> filter(fn: (r) => r._measurement == \"home_state\" and r.domain == \"sensor\" and r.entity_id == \"tcc_availability\" and r._field == \"state\")\n  |> last()\n  |> keep(columns: [\"_time\", \"_value\"])"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "noValue": "No recent data",
+          "custom": {
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^Value$/",
+          "values": false
+        },
+        "textMode": "auto",
+        "colorMode": "value"
+      }
+    },
+    {
+      "id": 13,
+      "title": "Home Assistant report age",
+      "type": "stat",
+      "gridPos": {
+        "x": 8,
+        "y": 27,
+        "w": 8,
+        "h": 4
+      },
+      "datasource": {
+        "type": "influxdb",
+        "uid": "home-history"
+      },
+      "description": "May include cached reports after failed polls; not a cloud-success timestamp.",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "home-history"
+          },
+          "query": "from(bucket: \"home_history\")\n  |> range(start: -90s)\n  |> filter(fn: (r) => r._measurement == \"home_state\" and r.domain == \"sensor\" and r.entity_id == \"tcc_ha_report_age\" and r._field == \"value\")\n  |> last()\n  |> keep(columns: [\"_time\", \"_value\"])"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "No recent data",
+          "custom": {
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "colorMode": "value"
+      }
+    },
+    {
+      "id": 14,
+      "title": "Time since reading / attributes changed",
+      "type": "stat",
+      "gridPos": {
+        "x": 16,
+        "y": 27,
+        "w": 8,
+        "h": 4
+      },
+      "datasource": {
+        "type": "influxdb",
+        "uid": "home-history"
+      },
+      "description": "Stable readings can legitimately remain unchanged. This is not an availability test.",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "home-history"
+          },
+          "query": "from(bucket: \"home_history\")\n  |> range(start: -90s)\n  |> filter(fn: (r) => r._measurement == \"home_state\" and r.domain == \"sensor\" and r.entity_id == \"tcc_ha_change_age\" and r._field == \"value\")\n  |> last()\n  |> keep(columns: [\"_time\", \"_value\"])"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "No recent data",
+          "custom": {
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "colorMode": "value"
+      }
+    },
+    {
+      "id": 15,
+      "title": "Indoor humidity history",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 31,
+        "w": 24,
+        "h": 7
+      },
+      "datasource": {
+        "type": "influxdb",
+        "uid": "home-history"
+      },
+      "description": "",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "home-history"
+          },
+          "query": "from(bucket: \"home_history\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"home_state\" and r.domain == \"sensor\" and r.entity_id == \"tcc_indoor_humidity\" and r._field == \"value\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: true)\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> rename(columns: {_value: \"Indoor humidity\"})"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "noValue": "No recent data",
+          "custom": {
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {},
+      "interval": "30s"
+    },
+    {
+      "id": 16,
+      "title": "Outdoor temperature",
+      "type": "stat",
+      "gridPos": {
+        "x": 0,
+        "y": 38,
+        "w": 12,
+        "h": 4
+      },
+      "datasource": {
+        "type": "influxdb",
+        "uid": "home-history"
+      },
+      "description": "Reading exposed by the discovered Honeywell outdoor sensor.",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "home-history"
+          },
+          "query": "from(bucket: \"home_history\")\n  |> range(start: -90s)\n  |> filter(fn: (r) => r._measurement == \"home_state\" and r.domain == \"sensor\" and r.entity_id == \"tcc_outdoor_temperature\" and r._field == \"value\")\n  |> last()\n  |> keep(columns: [\"_time\", \"_value\"])"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "fahrenheit",
+          "noValue": "No recent data",
+          "custom": {
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "colorMode": "value"
+      }
+    },
+    {
+      "id": 17,
+      "title": "Outdoor temperature history",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 42,
+        "w": 12,
+        "h": 7
+      },
+      "datasource": {
+        "type": "influxdb",
+        "uid": "home-history"
+      },
+      "description": "Reading exposed by the discovered Honeywell outdoor sensor.",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "home-history"
+          },
+          "query": "from(bucket: \"home_history\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"home_state\" and r.domain == \"sensor\" and r.entity_id == \"tcc_outdoor_temperature\" and r._field == \"value\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: true)\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> rename(columns: {_value: \"Outdoor temperature\"})"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "fahrenheit",
+          "noValue": "No recent data",
+          "custom": {
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "interval": "30s"
+    },
+    {
+      "id": 18,
+      "title": "Outdoor humidity",
+      "type": "stat",
+      "gridPos": {
+        "x": 12,
+        "y": 38,
+        "w": 12,
+        "h": 4
+      },
+      "datasource": {
+        "type": "influxdb",
+        "uid": "home-history"
+      },
+      "description": "Reading exposed by the discovered Honeywell outdoor sensor.",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "home-history"
+          },
+          "query": "from(bucket: \"home_history\")\n  |> range(start: -90s)\n  |> filter(fn: (r) => r._measurement == \"home_state\" and r.domain == \"sensor\" and r.entity_id == \"tcc_outdoor_humidity\" and r._field == \"value\")\n  |> last()\n  |> keep(columns: [\"_time\", \"_value\"])"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "noValue": "No recent data",
+          "custom": {
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "colorMode": "value"
+      }
+    },
+    {
+      "id": 19,
+      "title": "Outdoor humidity history",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 42,
+        "w": 12,
+        "h": 7
+      },
+      "datasource": {
+        "type": "influxdb",
+        "uid": "home-history"
+      },
+      "description": "Reading exposed by the discovered Honeywell outdoor sensor.",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "home-history"
+          },
+          "query": "from(bucket: \"home_history\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"home_state\" and r.domain == \"sensor\" and r.entity_id == \"tcc_outdoor_humidity\" and r._field == \"value\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: true)\n  |> keep(columns: [\"_time\", \"_value\"])\n  |> rename(columns: {_value: \"Outdoor humidity\"})"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "noValue": "No recent data",
+          "custom": {
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "interval": "30s"
+    },
+    {
+      "id": 20,
+      "title": "Observed heating \u2014 estimated minutes/day (up to 31 days)",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 49,
+        "w": 8,
+        "h": 8
+      },
+      "datasource": {
+        "type": "influxdb",
+        "uid": "home-history"
+      },
+      "description": "Shows up to the last 31 days within the selected range. America/Chicago calendar days, including 23/25-hour DST days. First day expands to midnight; today ends at the last complete 30-second window. Only equal idle/heating states at consecutive sample endpoints count as observed. Transitions, missing samples, unavailable, unknown and unverified cooling/fan-only states count as unknown. Days without coverage have no heating value. This is a conservative polling estimate, not energy use; cached cloud readings can still mask failures.",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "home-history"
+          },
+          "query": "import \"date\"\nimport \"timezone\"\noption location = timezone.location(name: \"America/Chicago\")\nselectedStart = date.truncate(t: v.timeRangeStart, unit: 1d)\nstop = date.truncate(t: v.timeRangeStop, unit: 30s)\nlimitStart = date.truncate(t: date.sub(d: 30d, from: stop), unit: 1d)\nstart = if selectedStart < limitStart then limitStart else selectedStart\ndata = from(bucket: \"home_history\")\n  |> range(start: start, stop: stop)\n  |> filter(fn: (r) => r._measurement == \"home_state\" and r.domain == \"sensor\" and r.entity_id == \"tcc_equipment_activity_code\" and r._field == \"value\")\nobserved = data\n  |> aggregateWindow(every: 30s, location: timezone.utc, fn: last, createEmpty: false)\n  |> keep(columns: [\"_time\", \"_value\"])\nmissing = data\n  |> aggregateWindow(every: 30s, location: timezone.utc, fn: count, createEmpty: true)\n  |> filter(fn: (r) => r._value == 0)\n  |> map(fn: (r) => ({_time: r._time, _value: -1.0}))\nsamples = union(tables: [observed, missing])\n  |> filter(fn: (r) => r._time > start and r._time <= stop)\n  |> group() |> sort(columns: [\"_time\"])\n  |> duplicate(column: \"_value\", as: \"delta\")\n  |> difference(columns: [\"delta\"], keepFirst: true)\n  |> map(fn: (r) => ({\n      _time: time(v: int(v: r._time) - 1), _start: start, _stop: stop,\n      known: if exists r.delta and r.delta == 0.0 and (r._value == 0.0 or r._value == 1.0) then 0.5 else 0.0,\n      heat: if exists r.delta and r.delta == 0.0 and r._value == 1.0 then 0.5 else 0.0\n  }))\n  |> group(columns: [\"_start\", \"_stop\"])\nheat = samples |> map(fn: (r) => ({r with _value: r.heat}))\n  |> aggregateWindow(every: 1d, fn: sum, timeSrc: \"_start\", createEmpty: false)\n  |> keep(columns: [\"_time\", \"_value\"]) |> rename(columns: {_value: \"heat\"})\nknown = samples |> map(fn: (r) => ({r with _value: r.known}))\n  |> aggregateWindow(every: 1d, fn: sum, timeSrc: \"_start\", createEmpty: false)\n  |> keep(columns: [\"_time\", \"_value\"]) |> rename(columns: {_value: \"known\"})\nunknown = samples |> map(fn: (r) => ({r with _value: 0.5 - r.known}))\n  |> aggregateWindow(every: 1d, fn: sum, timeSrc: \"_start\", createEmpty: false)\n  |> keep(columns: [\"_time\", \"_value\"]) |> rename(columns: {_value: \"unknown\"})\nobservedDaily = join(tables: {heat: heat, known: known}, on: [\"_time\"])\ndaily = join(tables: {observed: observedDaily, unknown: unknown}, on: [\"_time\"])\n\ndaily |> filter(fn: (r) => r.known > 0.0) |> map(fn: (r) => ({_time: r._time, \"Heating minutes\": r.heat}))"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "m",
+          "min": 0,
+          "noValue": "No verified coverage",
+          "custom": {
+            "drawStyle": "bars",
+            "barAlignment": 0,
+            "fillOpacity": 65,
+            "lineWidth": 1,
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      }
+    },
+    {
+      "id": 21,
+      "title": "Unknown / unobserved minutes per day (up to 31 days)",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 8,
+        "y": 49,
+        "w": 8,
+        "h": 8
+      },
+      "datasource": {
+        "type": "influxdb",
+        "uid": "home-history"
+      },
+      "description": "Shows up to the last 31 days within the selected range. America/Chicago calendar days, including 23/25-hour DST days. First day expands to midnight; today ends at the last complete 30-second window. Only equal idle/heating states at consecutive sample endpoints count as observed. Transitions, missing samples, unavailable, unknown and unverified cooling/fan-only states count as unknown. Days without coverage have no heating value. This is a conservative polling estimate, not energy use; cached cloud readings can still mask failures.",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "home-history"
+          },
+          "query": "import \"date\"\nimport \"timezone\"\noption location = timezone.location(name: \"America/Chicago\")\nselectedStart = date.truncate(t: v.timeRangeStart, unit: 1d)\nstop = date.truncate(t: v.timeRangeStop, unit: 30s)\nlimitStart = date.truncate(t: date.sub(d: 30d, from: stop), unit: 1d)\nstart = if selectedStart < limitStart then limitStart else selectedStart\ndata = from(bucket: \"home_history\")\n  |> range(start: start, stop: stop)\n  |> filter(fn: (r) => r._measurement == \"home_state\" and r.domain == \"sensor\" and r.entity_id == \"tcc_equipment_activity_code\" and r._field == \"value\")\nobserved = data\n  |> aggregateWindow(every: 30s, location: timezone.utc, fn: last, createEmpty: false)\n  |> keep(columns: [\"_time\", \"_value\"])\nmissing = data\n  |> aggregateWindow(every: 30s, location: timezone.utc, fn: count, createEmpty: true)\n  |> filter(fn: (r) => r._value == 0)\n  |> map(fn: (r) => ({_time: r._time, _value: -1.0}))\nsamples = union(tables: [observed, missing])\n  |> filter(fn: (r) => r._time > start and r._time <= stop)\n  |> group() |> sort(columns: [\"_time\"])\n  |> duplicate(column: \"_value\", as: \"delta\")\n  |> difference(columns: [\"delta\"], keepFirst: true)\n  |> map(fn: (r) => ({\n      _time: time(v: int(v: r._time) - 1), _start: start, _stop: stop,\n      known: if exists r.delta and r.delta == 0.0 and (r._value == 0.0 or r._value == 1.0) then 0.5 else 0.0,\n      heat: if exists r.delta and r.delta == 0.0 and r._value == 1.0 then 0.5 else 0.0\n  }))\n  |> group(columns: [\"_start\", \"_stop\"])\nheat = samples |> map(fn: (r) => ({r with _value: r.heat}))\n  |> aggregateWindow(every: 1d, fn: sum, timeSrc: \"_start\", createEmpty: false)\n  |> keep(columns: [\"_time\", \"_value\"]) |> rename(columns: {_value: \"heat\"})\nknown = samples |> map(fn: (r) => ({r with _value: r.known}))\n  |> aggregateWindow(every: 1d, fn: sum, timeSrc: \"_start\", createEmpty: false)\n  |> keep(columns: [\"_time\", \"_value\"]) |> rename(columns: {_value: \"known\"})\nunknown = samples |> map(fn: (r) => ({r with _value: 0.5 - r.known}))\n  |> aggregateWindow(every: 1d, fn: sum, timeSrc: \"_start\", createEmpty: false)\n  |> keep(columns: [\"_time\", \"_value\"]) |> rename(columns: {_value: \"unknown\"})\nobservedDaily = join(tables: {heat: heat, known: known}, on: [\"_time\"])\ndaily = join(tables: {observed: observedDaily, unknown: unknown}, on: [\"_time\"])\n\ndaily |> map(fn: (r) => ({_time: r._time, \"Unknown minutes\": r.unknown}))"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "m",
+          "min": 0,
+          "noValue": "No verified coverage",
+          "custom": {
+            "drawStyle": "bars",
+            "barAlignment": 0,
+            "fillOpacity": 65,
+            "lineWidth": 1,
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      }
+    },
+    {
+      "id": 22,
+      "title": "Daily observation coverage (up to 31 days)",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 16,
+        "y": 49,
+        "w": 8,
+        "h": 8
+      },
+      "datasource": {
+        "type": "influxdb",
+        "uid": "home-history"
+      },
+      "description": "Shows up to the last 31 days within the selected range. America/Chicago calendar days, including 23/25-hour DST days. First day expands to midnight; today ends at the last complete 30-second window. Only equal idle/heating states at consecutive sample endpoints count as observed. Transitions, missing samples, unavailable, unknown and unverified cooling/fan-only states count as unknown. Days without coverage have no heating value. This is a conservative polling estimate, not energy use; cached cloud readings can still mask failures.",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "home-history"
+          },
+          "query": "import \"date\"\nimport \"timezone\"\noption location = timezone.location(name: \"America/Chicago\")\nselectedStart = date.truncate(t: v.timeRangeStart, unit: 1d)\nstop = date.truncate(t: v.timeRangeStop, unit: 30s)\nlimitStart = date.truncate(t: date.sub(d: 30d, from: stop), unit: 1d)\nstart = if selectedStart < limitStart then limitStart else selectedStart\ndata = from(bucket: \"home_history\")\n  |> range(start: start, stop: stop)\n  |> filter(fn: (r) => r._measurement == \"home_state\" and r.domain == \"sensor\" and r.entity_id == \"tcc_equipment_activity_code\" and r._field == \"value\")\nobserved = data\n  |> aggregateWindow(every: 30s, location: timezone.utc, fn: last, createEmpty: false)\n  |> keep(columns: [\"_time\", \"_value\"])\nmissing = data\n  |> aggregateWindow(every: 30s, location: timezone.utc, fn: count, createEmpty: true)\n  |> filter(fn: (r) => r._value == 0)\n  |> map(fn: (r) => ({_time: r._time, _value: -1.0}))\nsamples = union(tables: [observed, missing])\n  |> filter(fn: (r) => r._time > start and r._time <= stop)\n  |> group() |> sort(columns: [\"_time\"])\n  |> duplicate(column: \"_value\", as: \"delta\")\n  |> difference(columns: [\"delta\"], keepFirst: true)\n  |> map(fn: (r) => ({\n      _time: time(v: int(v: r._time) - 1), _start: start, _stop: stop,\n      known: if exists r.delta and r.delta == 0.0 and (r._value == 0.0 or r._value == 1.0) then 0.5 else 0.0,\n      heat: if exists r.delta and r.delta == 0.0 and r._value == 1.0 then 0.5 else 0.0\n  }))\n  |> group(columns: [\"_start\", \"_stop\"])\nheat = samples |> map(fn: (r) => ({r with _value: r.heat}))\n  |> aggregateWindow(every: 1d, fn: sum, timeSrc: \"_start\", createEmpty: false)\n  |> keep(columns: [\"_time\", \"_value\"]) |> rename(columns: {_value: \"heat\"})\nknown = samples |> map(fn: (r) => ({r with _value: r.known}))\n  |> aggregateWindow(every: 1d, fn: sum, timeSrc: \"_start\", createEmpty: false)\n  |> keep(columns: [\"_time\", \"_value\"]) |> rename(columns: {_value: \"known\"})\nunknown = samples |> map(fn: (r) => ({r with _value: 0.5 - r.known}))\n  |> aggregateWindow(every: 1d, fn: sum, timeSrc: \"_start\", createEmpty: false)\n  |> keep(columns: [\"_time\", \"_value\"]) |> rename(columns: {_value: \"unknown\"})\nobservedDaily = join(tables: {heat: heat, known: known}, on: [\"_time\"])\ndaily = join(tables: {observed: observedDaily, unknown: unknown}, on: [\"_time\"])\n\ndaily |> map(fn: (r) => ({_time: r._time, \"Observed coverage\": 100.0 * r.known / (r.known + r.unknown)}))"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "noValue": "No verified coverage",
+          "custom": {
+            "drawStyle": "bars",
+            "barAlignment": 0,
+            "fillOpacity": 65,
+            "lineWidth": 1,
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      }
+    }
+  ],
+  "annotations": {
+    "list": []
+  }
+}

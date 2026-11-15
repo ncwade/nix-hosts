@@ -1,0 +1,155 @@
+# Monitoring snapshots only: no climate service calls and no extra cloud polling.
+# Resolve exactly one discovered US TCC climate entity; ambiguity fails closed.
+# Names are stable export identifiers; optional outdoor sensors are added after discovery.
+template:
+  - triggers:
+      - trigger: time_pattern
+        seconds: "/30"
+      - trigger: homeassistant
+        event: start
+    variables:
+      tcc_entities: "{{ integration_entities('honeywell') | select('match', '^climate\\.') | list }}"
+      tcc_entity: "{{ tcc_entities[0] if tcc_entities | count == 1 else '' }}"
+    sensor:
+      - name: "TCC Indoor temperature"
+        unique_id: tcc_indoor_temperature
+        default_entity_id: sensor.tcc_indoor_temperature
+        unit_of_measurement: "°F"
+        device_class: temperature
+        state_class: measurement
+        state: "{{ (state_attr(tcc_entity, 'current_temperature')) | float(none) }}"
+        availability: "{{ (tcc_entity != '' and has_value(tcc_entity)) }}"
+        attributes:
+          sampled_at: "{{ now().isoformat() }}"
+          source_entity: "{{ tcc_entity }}"
+      - name: "TCC Heating setpoint"
+        unique_id: tcc_heating_setpoint
+        default_entity_id: sensor.tcc_heating_setpoint
+        unit_of_measurement: "°F"
+        device_class: temperature
+        state_class: measurement
+        state: "{{ (state_attr(tcc_entity, 'target_temp_low') if states(tcc_entity) == 'heat_cool' else (state_attr(tcc_entity, 'temperature') if states(tcc_entity) == 'heat' else none)) | float(none) }}"
+        availability: "{{ (tcc_entity != '' and has_value(tcc_entity)) }}"
+        attributes:
+          sampled_at: "{{ now().isoformat() }}"
+          source_entity: "{{ tcc_entity }}"
+      - name: "TCC Cooling setpoint"
+        unique_id: tcc_cooling_setpoint
+        default_entity_id: sensor.tcc_cooling_setpoint
+        unit_of_measurement: "°F"
+        device_class: temperature
+        state_class: measurement
+        state: "{{ (state_attr(tcc_entity, 'target_temp_high') if states(tcc_entity) == 'heat_cool' else (state_attr(tcc_entity, 'temperature') if states(tcc_entity) == 'cool' else none)) | float(none) }}"
+        availability: "{{ (tcc_entity != '' and has_value(tcc_entity)) }}"
+        attributes:
+          sampled_at: "{{ now().isoformat() }}"
+          source_entity: "{{ tcc_entity }}"
+      - name: "TCC Indoor humidity"
+        unique_id: tcc_indoor_humidity
+        default_entity_id: sensor.tcc_indoor_humidity
+        unit_of_measurement: "%"
+        device_class: humidity
+        state_class: measurement
+        state: "{{ (state_attr(tcc_entity, 'current_humidity')) | float(none) }}"
+        availability: "{{ (tcc_entity != '' and has_value(tcc_entity)) }}"
+        attributes:
+          sampled_at: "{{ now().isoformat() }}"
+          source_entity: "{{ tcc_entity }}"
+      - name: "TCC Selected mode"
+        unique_id: tcc_selected_mode
+        default_entity_id: sensor.tcc_selected_mode
+        state: "{{ (states(tcc_entity) if tcc_entity else 'unknown_reading') if (tcc_entity != '' and has_value(tcc_entity)) else 'source_unavailable' }}"
+        attributes:
+          sampled_at: "{{ now().isoformat() }}"
+          source_entity: "{{ tcc_entity }}"
+      - name: "TCC Reported HVAC action"
+        unique_id: tcc_reported_hvac_action
+        default_entity_id: sensor.tcc_reported_hvac_action
+        state: "{{ (state_attr(tcc_entity, 'hvac_action') if state_attr(tcc_entity, 'hvac_action') in ['heating', 'cooling', 'idle', 'fan'] else 'unknown_reading') if (tcc_entity != '' and has_value(tcc_entity)) else 'source_unavailable' }}"
+        attributes:
+          sampled_at: "{{ now().isoformat() }}"
+          source_entity: "{{ tcc_entity }}"
+      - name: "TCC Fan setting"
+        unique_id: tcc_fan_setting
+        default_entity_id: sensor.tcc_fan_setting
+        state: "{{ (state_attr(tcc_entity, 'fan_mode') or 'unknown_reading') if (tcc_entity != '' and has_value(tcc_entity)) else 'source_unavailable' }}"
+        attributes:
+          sampled_at: "{{ now().isoformat() }}"
+          source_entity: "{{ tcc_entity }}"
+      - name: "TCC Reported fan activity"
+        unique_id: tcc_reported_fan_activity
+        default_entity_id: sensor.tcc_reported_fan_activity
+        state: "{{ ((state_attr(tcc_entity, 'fan_action') or 'unknown_reading') if state_attr(tcc_entity, 'fan_modes') else 'unknown_reading') if (tcc_entity != '' and has_value(tcc_entity)) else 'source_unavailable' }}"
+        attributes:
+          sampled_at: "{{ now().isoformat() }}"
+          source_entity: "{{ tcc_entity }}"
+      - name: "TCC Availability"
+        unique_id: tcc_availability
+        default_entity_id: sensor.tcc_availability
+        state: "{{ ('reported_available' if (tcc_entity != '' and has_value(tcc_entity)) else ('source_' ~ states(tcc_entity))) if tcc_entity else 'not_discovered_or_ambiguous' }}"
+        attributes:
+          sampled_at: "{{ now().isoformat() }}"
+          source_entity: "{{ tcc_entity }}"
+      - name: "TCC HA report age"
+        unique_id: tcc_ha_report_age
+        default_entity_id: sensor.tcc_ha_report_age
+        unit_of_measurement: "s"
+        state_class: measurement
+        state: "{{ (as_timestamp(now()) - as_timestamp(states[tcc_entity].last_reported) if tcc_entity != '' else none) | float(none) }}"
+        availability: "{{ (tcc_entity != '' and has_value(tcc_entity)) }}"
+        attributes:
+          sampled_at: "{{ now().isoformat() }}"
+          source_entity: "{{ tcc_entity }}"
+      - name: "TCC HA change age"
+        unique_id: tcc_ha_change_age
+        default_entity_id: sensor.tcc_ha_change_age
+        unit_of_measurement: "s"
+        state_class: measurement
+        state: "{{ (as_timestamp(now()) - as_timestamp(states[tcc_entity].last_updated) if tcc_entity != '' else none) | float(none) }}"
+        availability: "{{ (tcc_entity != '' and has_value(tcc_entity)) }}"
+        attributes:
+          sampled_at: "{{ now().isoformat() }}"
+          source_entity: "{{ tcc_entity }}"
+      - name: "TCC Upstream freshness"
+        unique_id: tcc_upstream_freshness
+        default_entity_id: sensor.tcc_upstream_freshness
+        state: "{{ 'not_exposed' }}"
+        attributes:
+          sampled_at: "{{ now().isoformat() }}"
+          source_entity: "{{ tcc_entity }}"
+      - name: "TCC Equipment activity code"
+        unique_id: tcc_equipment_activity_code
+        default_entity_id: sensor.tcc_equipment_activity_code
+        state: >-
+          {% if not tcc_entity %}-3
+          {% elif not (tcc_entity != '' and has_value(tcc_entity)) %}-2
+          {% else %}{{ {'idle': 0, 'heating': 1, 'cooling': 2, 'fan': 3}.get(state_attr(tcc_entity, 'hvac_action'), -1) }}{% endif %}
+        attributes:
+          sampled_at: "{{ now().isoformat() }}"
+          source_entity: "{{ tcc_entity }}"
+      - name: "TCC Outdoor temperature"
+        unique_id: tcc_outdoor_temperature
+        default_entity_id: sensor.tcc_outdoor_temperature
+        unit_of_measurement: "°F"
+        device_class: temperature
+        state_class: measurement
+        availability: "{{ tcc_entity != '' and has_value(tcc_entity) and has_value('sensor.sitting_room_sitting_room_thermostat_outdoor_temperature') }}"
+        state: >-
+          {% set e = 'sensor.sitting_room_sitting_room_thermostat_outdoor_temperature' %}
+          {% set value = states(e) | float(none) %}
+          {% set unit = state_attr(e, 'unit_of_measurement') %}
+          {{ (value * 9 / 5 + 32) if value is not none and unit == '°C' else (value if unit == '°F' else none) }}
+        attributes:
+          sampled_at: "{{ now().isoformat() }}"
+          source_entity: sensor.sitting_room_sitting_room_thermostat_outdoor_temperature
+      - name: "TCC Outdoor humidity"
+        unique_id: tcc_outdoor_humidity
+        default_entity_id: sensor.tcc_outdoor_humidity
+        unit_of_measurement: "%"
+        device_class: humidity
+        state_class: measurement
+        availability: "{{ tcc_entity != '' and has_value(tcc_entity) and has_value('sensor.sitting_room_sitting_room_thermostat_outdoor_humidity') }}"
+        state: "{{ states('sensor.sitting_room_sitting_room_thermostat_outdoor_humidity') | float(none) }}"
+        attributes:
+          sampled_at: "{{ now().isoformat() }}"
+          source_entity: sensor.sitting_room_sitting_room_thermostat_outdoor_humidity

@@ -18,6 +18,9 @@ NAS1's existing SMB documents share mounts on demand at `/mnt/nas1/docs` for
 `ncwade`; provision its runtime credential before use as described in the
 [Tycho setup guide](docs/tycho.md#nas1-documents-share).
 
+Thermostat monitoring uses Home Assistant, InfluxDB, and Grafana on Tycho.
+See [setup, data quality, and recovery](docs/home-monitoring.md).
+
 Build its dedicated USB installer on this Mac using the existing Docker Desktop
 Linux environment (avoids case-sensitivity problems in the Mac's Nix store):
 

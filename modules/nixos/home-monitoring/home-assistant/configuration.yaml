@@ -1,0 +1,23 @@
+default_config:
+homeassistant:
+  name: Tycho Home
+  time_zone: America/Chicago
+  unit_system: us_customary
+  packages: !include_dir_named packages
+logger:
+  default: warning
+recorder:
+  purge_keep_days: 10
+influxdb:
+  max_retries: 3
+  override_measurement: home_state
+  tags:
+    host: tycho
+  include:
+    entity_globs:
+      - sensor.tcc_*
+      # Add explicitly selected sensor.ecowitt_* entities here later.
+  ignore_attributes:
+    - sampled_at
+    - friendly_name
+    - icon

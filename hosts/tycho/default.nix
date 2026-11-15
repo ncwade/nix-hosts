@@ -11,6 +11,7 @@
     ./books.nix
     ./nas1.nix
     ./rex.nix
+    ./monitoring.nix
   ];
 
   networking.hostName = "tycho";
