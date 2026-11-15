@@ -363,58 +363,39 @@ References: [Libation container setup](https://getlibation.com/docs/installation
 
 ## Connector notifications
 
-Tycho hosts ntfy at `https://tycho.tailf3d82.ts.net:8443`, through Tailscale Serve.
-Its listener is loopback-only (`127.0.0.1:2586`); no public firewall port or
-Funnel is enabled. Anonymous access is denied. Topic `bookorbit` has a dedicated
-write-only `bookorbit-publisher` account and read-only `ncwade` account. Runtime
-credentials and password hashes are created once under
-`/var/lib/bookorbit-alerts` (root-only), never in the Nix store or this repository.
+The [Grafana → Home Assistant iPhone route](home-monitoring.md#grafana-alerts-to-iphone)
+replaces ntfy while preserving the monitor's failure/recovery decisions. Grafana
+and Home Assistant already use tsidp sign-in; the Companion app handles iPhone
+push delivery. ntfy's service, credential provisioner, publisher, and old
+`https://tycho.tailf3d82.ts.net:8443` endpoint are retired by the configuration.
 
-Install the ntfy iOS app, add this server and the `ncwade` user in Settings,
-then subscribe to `bookorbit` on that server. Retrieve the reader password from
-`credentials.json` through an administrator session. Keep Tailscale connected
-on the phone. The configured `https://ntfy.sh` upstream sends only a wake-up
-request with a message identifier and topic-URL hash; the phone fetches the
-actual message from Tycho. On 2026-11-13 the user confirmed receipt of both fresh
-failure and recovery test notifications while the iPhone app was backgrounded
-or the phone was locked. Authentication remained enabled; a proposed
-anonymous-access change was discarded before activation.
+`bookorbit-alert-check.timer` exports health every minute, and connector
+`OnFailure` hooks trigger an immediate check. Audible scan/auth/download failures,
+Kindle acquisition, and manual-file import failures open separate incidents.
+Recovery requires a new completed successful run; Kindle's ordinary lock deferral
+cannot clear an incident. Failed exports preserve state and retry. Grafana uses
+a five-minute maximum so brief failures remain visible, sends recovery after
+healthy samples replace that window, and reminds every four hours for continuing
+incidents. Missing telemetry or query errors alert too.
 
-`bookorbit-alert-check.timer` checks every minute, and connector `OnFailure`
-hooks trigger an immediate check. Audible scan/auth/download failures and
-Kindle acquisition and manual-file import failures open separate incidents. Repeated failures are
-suppressed. Recovery requires a new completed successful run; Kindle's ordinary
-lock deferral cannot clear an incident. Notification failures retain queued
-events for retry. An interruption after ntfy accepts a message but before local
-state is saved can duplicate that message (at-least-once delivery).
-
-Alerts contain only generic connector status; detailed errors stay in the
-service journal and private connector logs. This monitors Audible acquisition,
-Kindle library acquisition, and manual Kindle file imports separately. Kindle
-scans all library categories; expired loans or other Amazon denials remain
-reported failures. After the native-format update, acquisition resumed at
-14:00 CST with its hourly timer active. A snapshot of 53 completed ledger items
-passed independent hash, receipt, EPUB-spine, and native-format checks. The
-273-item first pass is still running, so complete-library success is not yet proven. There is no Bookshop connector. A same-host notifier cannot report a total Tycho
-or network outage while that outage is occurring.
+Alerts contain generic connector status; detailed errors stay in service journals
+and private connector logs. A same-host notifier cannot report a total Tycho
+outage while that outage is occurring. There is no Bookshop connector.
 
 ```sh
-systemctl status ntfy-sh bookorbit-alert-serve bookorbit-alert-check.timer
+systemctl status bookorbit-alert-check.timer home-monitoring
 journalctl -u bookorbit-audible -u bookorbit-kindle-sync -u bookorbit-kindle -u bookorbit-alert-check
-sudo bookorbit-alert-check --test-event failure
-sudo bookorbit-alert-check --test-event recovery
+sudo systemctl start bookorbit-alert-check.service
 ```
 
-The encrypted BookOrbit backup includes notification credentials, pending events,
-incident state and connector success markers. Restore `staging/alerts` to
+Use Grafana's **home-assistant-iphone** contact point to test notification delivery.
+The previous `--test-event` ntfy commands are removed. See the monitoring guide
+for phone onboarding, live migration acceptance, and rollback.
+
+The encrypted BookOrbit backup still includes incident state, connector success
+markers, and retained legacy credentials. Restore `staging/alerts` to
 `/var/lib/bookorbit-alerts` and `staging/connector-health` to
 `/var/lib/bookorbit-connector-health`, with mode 0700 directories, before starting
-ntfy and the monitor. Provisioned users/ACLs are recreated on startup. The
-seven-day ntfy message cache is disposable and is not included in backups.
-
-Acceptance on 2026-11-13: Nix assertions and system build passed; focused tests
-cover deduplication, recovery, lock deferral, pending-event retry, missing
-credentials and Audible partial failures. Live checks confirmed anonymous
-reads are denied, reader/publisher permissions are separated, and a temporary
-invalid Kindle export generates exactly one failure and one subsequent recovery.
-The test export was removed and the normal importer timer restored.
+the monitor. The monitoring backup separately includes Grafana/HA configuration,
+the selected phone action, webhook secret, and InfluxDB credentials. No legacy
+notification data is deleted by this migration.

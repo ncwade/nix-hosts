@@ -1,6 +1,5 @@
-"""Monitor completed connector runs; retain unsent events for retry."""
+"""Monitor completed connector runs and export latched incident health to Grafana."""
 import argparse
-import base64
 import fcntl
 import json
 import os
@@ -52,50 +51,49 @@ def inspect(connector, marker):
     return None, marker.stat().st_mtime if marker.exists() else 0
 
 
-def publish(event, credentials, url):
-    name = {'kindle-sync': 'Kindle downloads', 'kindle': 'Kindle import'}.get(event['connector'], event['connector'].capitalize())
-    failed = event['kind'] == 'failure'
-    message = (f'{name} connector failed on Tycho. {event["reason"]}' if failed else
-               f'{name} connector recovered on Tycho after a completed successful run.')
-    payload = {'topic': 'bookorbit', 'title': f'BookOrbit: {name} {event["kind"]}',
-               'message': message, 'priority': 4 if failed else 3,
-               'tags': ['warning'] if failed else ['white_check_mark']}
-    password = credentials['bookorbit-publisher']
-    authorization = base64.b64encode(f'bookorbit-publisher:{password}'.encode()).decode()
-    request = urllib.request.Request(url, data=json.dumps(payload).encode(), headers={
-        'Authorization': f'Basic {authorization}', 'Content-Type': 'application/json'})
+def publish_health(state, token_file, url='http://127.0.0.1:8086/api/v2/write?org=home&bucket=home_history&precision=s'):
+    # A running job or lock deferral cannot clear a latched incident. Preserve
+    # failures that recovered while InfluxDB was unreachable for one accepted
+    # sample, so the next healthy sample cannot erase an unseen failure.
+    failed = set(state.get('incidents', {})) | {
+        event['connector'] for event in state.get('pending', []) if event['kind'] == 'failure'
+    }
+    timestamp = int(time.time())
+    lines = [f'bookorbit_health,host=tycho,connector={name} failed={int(name in failed)}i {timestamp}'
+             for name in CONNECTORS]
+    request = urllib.request.Request(url, data=('\n'.join(lines) + '\n').encode(), headers={
+        'Authorization': 'Token ' + Path(token_file).read_text().strip(),
+        'Content-Type': 'text/plain'})
     with urllib.request.urlopen(request, timeout=10) as response:
-        if json.load(response).get('event') != 'message':
-            raise RuntimeError('ntfy did not confirm message acceptance')
+        if response.status != 204:
+            raise RuntimeError('InfluxDB did not confirm health acceptance')
 
 
-def flush(state, path, send):
-    while state.get('pending'):
-        send(state['pending'][0])
-        state['pending'].pop(0)
-        save(path, state)
+def deliver(state, path):
+    token_file = os.environ.get('BOOKORBIT_INFLUX_TOKEN_FILE')
+    if not token_file:
+        raise RuntimeError('The Grafana health exporter credential is not configured')
+    publish_health(state, token_file)
+    # Preserve existing incidents through the transition. Clear legacy events
+    # only after InfluxDB accepts health; the next timer run retries failures.
+    state['pending'] = []
+    save(path, state)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--test-event', choices=['failure', 'recovery'])
-    args = parser.parse_args()
+    parser.parse_args()
     os.umask(0o077)
     root = Path('/var/lib/bookorbit-alerts')
     with (root / 'check.lock').open('a') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         path = root / 'state.json'
         state = json.loads(path.read_text()) if path.exists() else {'incidents': {}, 'pending': []}
-        credentials = json.loads((root / 'credentials.json').read_text())
-        if args.test_event:
-            state['pending'].append({'connector': 'test', 'kind': args.test_event,
-                                     'reason': 'Intentional notification delivery test.', 'time': time.time()})
-        else:
-            for connector, marker in CONNECTORS.items():
-                failure, success_time = inspect(connector, marker)
-                transition(state, connector, failure, success_time, time.time())
+        for connector, marker in CONNECTORS.items():
+            failure, success_time = inspect(connector, marker)
+            transition(state, connector, failure, success_time, time.time())
         save(path, state)
-        flush(state, path, lambda event: publish(event, credentials, 'http://127.0.0.1:2586/'))
+        deliver(state, path)
 
 
 if __name__ == '__main__':

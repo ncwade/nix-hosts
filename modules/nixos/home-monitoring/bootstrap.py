@@ -45,7 +45,7 @@ if setup['allowed']:
                          'retentionPeriodSeconds': 5 * 365 * 86400})
 org = api('/api/v2/orgs?org=home')['orgs'][0]['id']
 bucket = api('/api/v2/buckets?orgID=' + org + '&name=home_history')['buckets'][0]['id']
-for name, action in (('ha-write-token', 'write'), ('grafana-read-token', 'read')):
+for name, action in (('ha-write-token', 'write'), ('grafana-read-token', 'read'), ('bookorbit-write-token', 'write')):
     p = ROOT / 'secrets' / name
     if not p.exists():
         result = api('/api/v2/authorizations', {

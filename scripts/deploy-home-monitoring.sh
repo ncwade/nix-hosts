@@ -32,7 +32,7 @@ for port in 8123 3002 8086; do
   done
   [ "$ready" = true ]
 done
-systemctl is-active podman-bookorbit podman-bookorbit-db tsidp rex-login-server ntfy-sh
+systemctl is-active podman-bookorbit podman-bookorbit-db tsidp rex-login-server
 nixos-rebuild switch --flake "path:$source_dir#tycho" --no-write-lock-file
 trap - ERR
 # Copy only this feature; preserve all independently deployed host changes.

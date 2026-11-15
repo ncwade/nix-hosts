@@ -286,11 +286,13 @@ failures are retained while other books continue. An HTTP 403 with the exact
 observed Amazon message that a loan has ended is classified `loan_ended`; it
 does not count toward the stop after three unknown consecutive denials. It still
 remains a failed item and prevents a complete-success marker. Other 403 responses
-are not silently classified as expired loans. The existing ntfy monitor
-sends one failure per incident and one recovery after a later complete successful
-run. It monitors acquisition separately from the five-minute manual-file importer.
+are not silently classified as expired loans. The connector health monitor
+tracks each incident until a later complete successful run. Grafana sends failure
+and recovery notifications, with four-hour reminders for continuing incidents.
+Acquisition is monitored separately from the five-minute manual-file importer.
 On 2026-11-13 the user confirmed both failure and recovery test notifications
-arrived with ntfy backgrounded or the iPhone locked. Authentication remains enabled.
+arrived with ntfy backgrounded or the iPhone locked. That historical acceptance
+predates the [Grafana → Home Assistant migration](home-monitoring.md#grafana-alerts-to-iphone).
 
 For an authentication failure that requires interactive sign-in, stop the
 acquisition timer and let the current media operation finish. In a private SSH

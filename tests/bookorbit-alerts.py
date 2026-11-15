@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+import os
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1] / 'modules/nixos/bookorbit'
@@ -18,6 +19,60 @@ alerts = load('alerts')
 health = load('audible-health')
 
 class AlertsTest(unittest.TestCase):
+    def test_health_exports_latched_incidents_and_requires_acceptance(self):
+        with tempfile.TemporaryDirectory() as temp:
+            token = Path(temp) / 'token'
+            token.write_text('private-test-token')
+            state = {}
+            alerts.transition(state, 'kindle', 'failed', 0, 10)
+            alerts.transition(state, 'kindle', None, 5, 20)
+            with patch.object(alerts.urllib.request, 'urlopen') as send:
+                send.return_value.__enter__.return_value.status = 204
+                alerts.publish_health(state, token)
+                request = send.call_args.args[0]
+                self.assertIn(b'connector=kindle failed=1i ', request.data)
+                self.assertIn(b'connector=audible failed=0i ', request.data)
+                self.assertEqual(request.get_header('Authorization'), 'Token private-test-token')
+                send.return_value.__enter__.return_value.status = 200
+                with self.assertRaises(RuntimeError): alerts.publish_health(state, token)
+
+    def test_recovery_during_export_outage_does_not_hide_the_failure(self):
+        with tempfile.TemporaryDirectory() as temp:
+            token = Path(temp) / 'token'
+            token.write_text('private-test-token')
+            state = {}
+            alerts.transition(state, 'kindle', 'failed', 0, 10)
+            alerts.transition(state, 'kindle', None, 15, 20)
+            self.assertNotIn('kindle', state['incidents'])
+            with patch.dict(os.environ, BOOKORBIT_INFLUX_TOKEN_FILE=str(token)), \
+                    patch.object(alerts.urllib.request, 'urlopen') as send:
+                send.return_value.__enter__.return_value.status = 204
+                alerts.deliver(state, Path(temp) / 'state.json')
+                self.assertIn(b'connector=kindle failed=1i ', send.call_args.args[0].data)
+                alerts.deliver(state, Path(temp) / 'state.json')
+                self.assertIn(b'connector=kindle failed=0i ', send.call_args.args[0].data)
+
+    def test_cutover_preserves_incidents_and_retries_failed_exports(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / 'state.json'
+            state = {'incidents': {'kindle': {'since': 10}}, 'pending': [{'kind': 'failure'}]}
+            alerts.save(path, state)
+            with patch.dict(os.environ, BOOKORBIT_INFLUX_TOKEN_FILE='unused'), \
+                    patch.object(alerts, 'publish_health') as health:
+                health.side_effect = OSError('offline')
+                with self.assertRaises(OSError): alerts.deliver(state, path)
+                self.assertTrue(json.loads(path.read_text())['pending'])
+                health.side_effect = None
+                alerts.deliver(state, path)
+                self.assertFalse(json.loads(path.read_text())['pending'])
+                self.assertIn('kindle', json.loads(path.read_text())['incidents'])
+
+    def test_missing_exporter_credential_fails_without_discarding_state(self):
+        state = {'incidents': {'kindle': {'since': 10}}, 'pending': [{'kind': 'failure'}]}
+        with patch.dict(os.environ, {}, clear=True):
+            with self.assertRaises(RuntimeError): alerts.deliver(state, Path('/unused'))
+        self.assertTrue(state['pending'])
+
     def test_incident_dedup_lock_deferral_and_recovery(self):
         state = {}
         alerts.transition(state, 'kindle', 'failed', 0, 10)
@@ -29,19 +84,6 @@ class AlertsTest(unittest.TestCase):
         self.assertEqual([e['kind'] for e in state['pending']], ['failure', 'recovery'])
         alerts.transition(state, 'kindle', 'failed again', 35, 60)
         self.assertEqual(len(state['pending']), 3)
-
-    def test_transport_failure_retains_events_for_retry(self):
-        with tempfile.TemporaryDirectory() as temp:
-            path = Path(temp) / 'state.json'
-            state = {'pending': [{'kind': 'failure'}, {'kind': 'recovery'}]}
-            alerts.save(path, state)
-            def fail(event): raise OSError('offline')
-            with self.assertRaises(OSError): alerts.flush(state, path, fail)
-            self.assertEqual(len(json.loads(path.read_text())['pending']), 2)
-            sent = []
-            alerts.flush(state, path, sent.append)
-            self.assertEqual([e['kind'] for e in sent], ['failure', 'recovery'])
-            self.assertFalse(json.loads(path.read_text())['pending'])
 
     def test_running_service_cannot_clear_incident(self):
         with patch.object(alerts.subprocess, 'run') as run:

@@ -7,10 +7,11 @@ in
 assert t.personal.bookorbit.enable;
 assert t.personal.bookorbit.audible.enable;
 assert t.personal.bookorbit.kindle.enable;
-assert t.services.ntfy-sh.enable;
-assert t.services.ntfy-sh.settings.auth-default-access == "deny-all";
-assert t.services.ntfy-sh.settings.listen-http == "127.0.0.1:2586";
-assert t.services.ntfy-sh.settings.upstream-base-url == "https://ntfy.sh";
+assert !t.services.ntfy-sh.enable;
+assert !(t.systemd.services ? bookorbit-alert-serve);
+assert !(t.systemd.services ? bookorbit-alert-secrets);
+assert t.systemd.services.bookorbit-alert-check.serviceConfig.Environment ==
+  "BOOKORBIT_INFLUX_TOKEN_FILE=/var/lib/home-monitoring/secrets/bookorbit-write-token";
 assert !(builtins.elem 2586 t.networking.firewall.allowedTCPPorts);
 assert t.systemd.services.bookorbit-audible.unitConfig.OnFailure == [ "bookorbit-alert-check.service" ];
 assert t.systemd.services.bookorbit-kindle.unitConfig.OnFailure == [ "bookorbit-alert-check.service" ];

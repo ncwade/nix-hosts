@@ -1,6 +1,6 @@
 # Tycho thermostat monitoring
 
-Home Assistant → InfluxDB 2 → Grafana. The only device integration in scope is
+Home Assistant → InfluxDB 2 → Grafana. The thermostat integration is
 **Honeywell Total Connect Comfort (US)** (`honeywell`). Nothing here invokes
 climate, fan, schedule, humidifier, or switch controls. Home Assistant's built-in
 integration itself exposes controls; use the Grafana dashboard for monitoring.
@@ -57,6 +57,80 @@ without printing tokens or response bodies. Grafana gets a **read-only token
 scoped to home_history**; Home Assistant gets a separate write-only bucket token.
 The operator token remains in a root-only file for administration and recovery.
 Treat container inspection output, HA backups and diagnostics as sensitive.
+
+## Grafana alerts to iPhone
+
+The notification route is Grafana → a local Home Assistant webhook → the
+selected iPhone's Companion app. It reuses the existing tsidp logins and private
+service addresses. No additional notification server is required. Home Assistant
+uses its mobile push infrastructure for delivery; this is not an entirely local
+push service. Generic connector status is sent, never connector logs or secrets.
+
+`configure_alerting.py` provisions the `home-assistant-iphone` contact point and
+three rules in **Tycho alerts**, for Audible downloads, Kindle downloads and
+Kindle import. It does not replace Grafana's notification policy tree. The rules
+are evaluated every minute, with four-hour reminders for continuing incidents.
+They query `bookorbit_health` in `home_history`, using a five-minute maximum so
+brief failures remain visible. Recovery requires the existing monitor to observe
+a successful completed run, followed by five minutes without failed samples.
+Missing samples for five minutes or query errors also alert; these conditions
+must not be interpreted as healthy connectors. An outage of Tycho itself still
+requires a monitor running elsewhere.
+
+The existing BookOrbit monitor exports its latched incident state every minute
+and on connector failures. A separate root-only `bookorbit-write-token` has only
+write access to `home_history`; Grafana retains its read-only token. Failed
+exports preserve incident state and retry on the next check. Persistent missing
+telemetry becomes a Grafana alert. ntfy is no longer configured.
+
+Phone setup:
+
+1. Connect the Home Assistant Companion app to the private HA address above and
+   allow notifications in iOS Settings. Find the exact action under HA
+   **Settings → Developer tools/Tools → Actions**, filtering for `mobile_app`.
+2. Store that action name in
+   `/var/lib/home-monitoring/secrets/iphone-notify-service`. The verified target
+   on 2026-11-15 is `notify.mobile_app_iphone_personal`. Provisioning never guesses
+   a device or broadcasts to all phones. Without this selection, rules remain
+   paused and the webhook automation is absent.
+3. Deploy the reviewed NixOS configuration. Provisioning creates the selected
+   phone automation and the three Grafana rules. Confirm all three queries return
+   connector health samples.
+4. Test the contact point in Grafana, including firing and resolved messages,
+   with the iPhone locked. The direct Home Assistant notification test alone does
+   not verify the Grafana webhook route.
+
+For the existing Tycho transition, first activate the separately staged
+`/home/ncwade/grafana-alerting-20261115/scripts/deploy-grafana-alerting.py`
+with `notify.mobile_app_iphone_personal`. That transitional bundle keeps ntfy
+running. After the live Grafana firing/recovery phone tests pass, run the final
+bundle's `sudo python3 scripts/retire-ntfy.py --phone-delivery-confirmed`.
+The retirement helper checks the expected live source, all three queries and
+service health, builds before activation, preserves active connector jobs, and
+verifies that the ntfy listener and Tailscale port 8443 are gone. It changes only
+the alert monitor source in the live configuration and retains recovery copies
+under `/var/lib/nixos-source-backups/ntfy-retirement-*`. It rolls back on failed
+activation or validation. Do not pass the confirmation flag before observing
+both messages on the phone.
+
+The random webhook ID is generated once under root-only `secrets/`; it is never
+committed or put in the Nix store. Generated Grafana provisioning has mode 0640
+and group 472; the generated HA package has mode 0600. The webhook accepts local
+POSTs and its only action is sending phone notifications. Treat its ID as a
+credential, including when viewing contact-point exports in Grafana. All runtime
+configuration and secrets are covered by the existing encrypted monitoring backup.
+
+ntfy's service, Tailscale Serve endpoint, credential provisioner, and publisher
+are removed from the configuration. Existing `/var/lib/bookorbit-alerts`
+credentials and incident state are preserved; no ntfy cache or backup is deleted.
+The old `bookorbit-alert-check --test-event` command is retired; test notification
+delivery through Grafana's contact point instead.
+
+To roll back retirement, restore the two `modules/nixos/bookorbit/alerts.*`
+files and `alert-secrets.py` from the matching recovery directory's
+`previous-source`, then rebuild that configuration. Alternatively set the system
+profile to the path recorded in its `system` file and activate that generation.
+This restores ntfy without deleting the Grafana route or either service's data.
 
 The `home` organization's `home_history` bucket retains **1825 days** (five
 365-day years) of original readings. Expired data is deleted by InfluxDB; no

@@ -71,7 +71,9 @@ services:
       GF_LOG_LEVEL: error
     volumes:
       - /var/lib/home-monitoring/grafana:/var/lib/grafana
-      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - /var/lib/home-monitoring/alerting:/etc/grafana/provisioning/alerting:ro
       - ./grafana/dashboards:/etc/grafana/dashboards:ro
     healthcheck:
       test: [CMD, wget, -q, -O, /dev/null, 'http://127.0.0.1:3002/api/health']

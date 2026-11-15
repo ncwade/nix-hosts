@@ -40,6 +40,7 @@ in {
       python3 ${source}/configure_http.py
       python3 ${source}/configure_homeassistant.py ${source}/home-assistant/configuration.yaml
       python3 ${source}/configure_sso.py ${oidc}
+      python3 ${source}/configure_alerting.py
       install -m 0600 ${source}/home-assistant/tcc.yaml /var/lib/home-monitoring/home-assistant/packages/tcc.yaml
       ${compose} up -d --remove-orphans
     '';
