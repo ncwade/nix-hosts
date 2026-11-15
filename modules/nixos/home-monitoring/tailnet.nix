@@ -1,4 +1,4 @@
-{ lib, pkgs, ... }:
+{ config, lib, pkgs, ... }:
 let
   apps = [
     { name = "home-assistant"; port = 8123; redirectPort = 8124; }
@@ -42,7 +42,13 @@ let
     };
   };
 in {
-  systemd.services = lib.mkMerge (map servicesFor apps);
+  imports = [ ../tailnet-services ];
+  personal.tailnetServices.services = builtins.listToAttrs (map (app: {
+    name = app.name;
+    value = { inherit (app) port redirectPort; after = [ "home-monitoring.service" ]; };
+  }) apps);
+  systemd.services = lib.mkIf (config.personal.tailnetServices.phase != "services")
+    (lib.mkMerge (map servicesFor apps));
   services.nginx.enable = true;
   services.nginx.virtualHosts = builtins.listToAttrs (map (app: {
     name = "${app.name}-shortcut";

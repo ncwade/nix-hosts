@@ -37,6 +37,7 @@ nixos-rebuild switch --flake "path:$source_dir#tycho" --no-write-lock-file
 trap - ERR
 # Copy only this feature; preserve all independently deployed host changes.
 cp -a "$source_dir/modules/nixos/home-monitoring" /etc/nixos/modules/nixos/
+cp -a "$source_dir/modules/nixos/tailnet-services" /etc/nixos/modules/nixos/
 cp -a "$source_dir/hosts/tycho/monitoring.nix" /etc/nixos/hosts/tycho/
 if ! grep -q './monitoring.nix' /etc/nixos/hosts/tycho/default.nix; then
   sed -i '/\.\/rex.nix/a\    ./monitoring.nix' /etc/nixos/hosts/tycho/default.nix

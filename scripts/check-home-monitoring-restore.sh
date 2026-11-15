@@ -15,8 +15,11 @@ bookorbit-restic restore latest --host tycho --tag home-monitoring --verify --ta
 stage=$restore_dir/var/lib/home-monitoring-backup/staging
 state=$stage/state
 test -s "$state/home-assistant/.storage/core.config_entries"
-test -s "$state/tailnet/home-assistant/tailscaled.state"
-test -s "$state/tailnet/grafana/tailscaled.state"
+# Legacy snapshots include app-node identities. Services snapshots may omit
+# them: re-enroll the shared host, retaining the control-plane Service addresses.
+for app in home-assistant grafana; do
+  if [ -d "$state/tailnet/$app" ]; then test -s "$state/tailnet/$app/tailscaled.state"; fi
+done
 python3 - "$state" <<'PY'
 import sqlite3,sys
 from pathlib import Path

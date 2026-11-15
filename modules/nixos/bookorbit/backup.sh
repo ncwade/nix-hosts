@@ -6,7 +6,7 @@ stage=/var/lib/bookorbit-backup/staging
 mkdir -p "$stage" /run/bookorbit-backup
 # Only the local staging tree is mutated here. Network failure cannot hold the
 # application offline. ext4 has no snapshots, so pre-copy before quiescing.
-mkdir -p "$stage/books" "$stage/app" "$stage/tsidp" "$stage/tailnet" "$stage/secrets" "$stage/config"
+mkdir -p "$stage/books" "$stage/app" "$stage/tsidp" "$stage/secrets" "$stage/config"
 precopy() {
   local status=0
   rsync -a --delete --exclude='/.libation-in-progress/' "$1" "$2" || status=$?
@@ -33,7 +33,12 @@ mv "$stage/postgres.sql.tmp" "$stage/postgres.sql"
 tsidp_state=$(readlink -f /var/lib/tsidp)
 test -d "$tsidp_state"
 rsync -a --delete "$tsidp_state/" "$stage/tsidp/"
-rsync -a --delete /var/lib/bookorbit-tailnet/ "$stage/tailnet/"
+# Legacy identities remain available for rollback. Fresh Services installs do
+# not have one; the shared service host can be re-enrolled without changing URLs.
+if [ -d /var/lib/bookorbit-tailnet ]; then
+  mkdir -p "$stage/tailnet"
+  rsync -a --delete /var/lib/bookorbit-tailnet/ "$stage/tailnet/"
+fi
 rsync -a --delete /var/lib/bookorbit/secrets/ "$stage/secrets/"
 rsync -a --delete /etc/bookorbit/ "$stage/config/"
 if [ -d /var/lib/libation ]; then

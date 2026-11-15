@@ -12,6 +12,7 @@
     ./nas1.nix
     ./rex.nix
     ./monitoring.nix
+    ./tailnet-services.nix
   ];
 
   networking.hostName = "tycho";

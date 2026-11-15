@@ -60,7 +60,7 @@ The app binds to `127.0.0.1:3000`; PostgreSQL binds to `127.0.0.1:5433`.
 Host networking lets the app reach the tailnet's OIDC issuer through the host's
 DNS and routing. Neither port is opened in the firewall.
 
-A dedicated userspace Tailscale node publishes
+During the Tailscale Services preparation stage, a dedicated userspace node publishes
 `https://bookorbit.tailf3d82.ts.net`. Its HTTPS listener proxies to BookOrbit;
 `http://bookorbit` redirects to the full HTTPS name through a loopback-only nginx
 listener on port 3001. HTTPS is required for the browser's OIDC PKCE crypto API,
@@ -78,6 +78,11 @@ On first deployment, obtain the BookOrbit node enrollment URL from
 daemon uses `/run/bookorbit-tailnet/tailscaled.sock`; use
 `sudo tailscale --socket=/run/bookorbit-tailnet/tailscaled.sock status` to inspect
 it. The machine's ordinary `tailscale status` manages Tycho instead.
+
+For the transition to a shared tagged host, see [Tailscale Services](tailscale-services.md).
+In the `services` phase, `svc:bookorbit` owns the same address and the old daemon
+is stopped; its state is retained for rollback. Fresh Services installations
+re-enroll the shared host after recovery instead of restoring a per-app identity.
 
 ## Deploy and provision
 

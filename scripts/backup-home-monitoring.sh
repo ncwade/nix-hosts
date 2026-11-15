@@ -16,7 +16,9 @@ done
 resume() { if [ "${#resume_units[@]}" -gt 0 ]; then systemctl start "${resume_units[@]}"; fi; }
 trap resume EXIT
 trap 'exit 130' INT TERM
-systemctl stop "${units[@]}"
+# Removed legacy units are absent after the Services migration. Stop only the
+# units that were active, and never interrupt the shared publication host.
+if [ "${#resume_units[@]}" -gt 0 ]; then systemctl stop "${resume_units[@]}"; fi
 rsync -a --delete /var/lib/home-monitoring/ "$stage/state/"
 rsync -a --delete /etc/nixos/modules/nixos/home-monitoring/ "$stage/configuration/"
 docker images --digests --format '{{.Repository}}:{{.Tag}} {{.Digest}}' > "$stage/images.txt"

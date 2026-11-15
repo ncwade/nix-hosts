@@ -40,7 +40,8 @@ the selector with the intended entity after identifying the thermostat.
 Images are pinned by version and digest in
 `modules/nixos/home-monitoring/compose.yaml`. NixOS starts Docker Compose through
 `home-monitoring.service`; existing Podman applications remain independent.
-All three listeners bind to loopback using host networking. Tailscale Serve
+All three listeners bind to loopback using host networking. During the
+[Tailscale Services preparation stage](tailscale-services.md), Tailscale Serve
 publishes HA and Grafana on their own dedicated userspace nodes, without Funnel
 or LAN firewall exceptions. Their identities are persisted under `tailnet/` in
 the state directory and included in backups. Bare `http://home-assistant` and
@@ -48,6 +49,12 @@ the state directory and included in backups. Bare `http://home-assistant` and
 independent. Enroll each new node using the login URL in the corresponding
 `home-assistant-tailnet-serve` / `grafana-tailnet-serve` journal. Check node key
 expiry in Tailscale and renew before expiry.
+
+After cutover, `svc:home-assistant` and `svc:grafana` retain these same addresses
+through the shared tagged host. The per-app daemons stop and their saved identities
+remain available for rollback. The backup scripts also support fresh Services
+installations without legacy identity directories; recovery re-enrolls a shared
+host against the existing Services.
 
 Persistent data lives under `/var/lib/home-monitoring/`: `home-assistant/`
 (including credentials in `.storage`), `influxdb/`, `influx-config/`, `grafana/`,

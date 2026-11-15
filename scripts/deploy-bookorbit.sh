@@ -33,7 +33,12 @@ if [ "$host" = tycho ]; then
     sleep 2
   done
   [ "$healthy" = true ]
-  systemctl is-active tsidp bookorbit-serve bookorbit-tailnet bookorbit-tailnet-serve nginx
+  systemctl is-active tsidp bookorbit-serve nginx
+  if systemctl cat tailnet-services-publish.service >/dev/null 2>&1; then
+    systemctl is-active tailnet-services tailnet-services-publish
+  else
+    systemctl is-active bookorbit-tailnet bookorbit-tailnet-serve
+  fi
 else
   systemctl is-active nas1-documents nas1-bookorbit-backup-directory
   test -d /mnt/Data/documents/backups/tycho/bookorbit

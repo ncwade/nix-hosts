@@ -19,7 +19,7 @@ let
     '';
   };
 in {
-  imports = [ ./audible.nix ./kindle.nix ./kindle-sync.nix ./alerts.nix ];
+  imports = [ ./audible.nix ./kindle.nix ./kindle-sync.nix ./alerts.nix ../tailnet-services ];
   options.personal.bookorbit = {
     enable = lib.mkEnableOption "BookOrbit with local storage and nightly encrypted backups";
     url = lib.mkOption { type = lib.types.str; default = "https://bookorbit.tailf3d82.ts.net"; };
@@ -153,9 +153,14 @@ in {
       enable = true;
       settings = { hostName = "idp"; enableFunnel = false; enableSts = false; };
     };
-    # A separate userspace node gives the application its own MagicDNS name
-    # without changing Tycho's machine identity or its Rex/SSH access policy.
-    systemd.services.bookorbit-tailnet = {
+    personal.tailnetServices.services.bookorbit = {
+      port = 3000;
+      redirectPort = 3001;
+      after = [ "podman-bookorbit.service" ];
+    };
+    # Retain the original nodes during preparation and for rollback. Switching
+    # to Services stops these units but never deletes their identity state.
+    systemd.services.bookorbit-tailnet = lib.mkIf (config.personal.tailnetServices.phase != "services") {
       description = "Dedicated BookOrbit Tailscale identity";
       wantedBy = [ "multi-user.target" ];
       wants = [ "network-online.target" ];
@@ -171,7 +176,7 @@ in {
         RestartSec = "5s";
       };
     };
-    systemd.services.bookorbit-tailnet-serve = {
+    systemd.services.bookorbit-tailnet-serve = lib.mkIf (config.personal.tailnetServices.phase != "services") {
       description = "Publish BookOrbit on its dedicated tailnet node";
       wantedBy = [ "multi-user.target" ];
       requires = [ "bookorbit-tailnet.service" ];
