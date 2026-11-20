@@ -20,7 +20,7 @@ trap 'exit 130' INT TERM
 # units that were active, and never interrupt the shared publication host.
 if [ "${#resume_units[@]}" -gt 0 ]; then systemctl stop "${resume_units[@]}"; fi
 rsync -a --delete /var/lib/home-monitoring/ "$stage/state/"
-rsync -a --delete /etc/nixos/modules/nixos/home-monitoring/ "$stage/configuration/"
+rsync -a --delete /etc/home-monitoring/source/ "$stage/configuration/"
 docker images --digests --format '{{.Repository}}:{{.Tag}} {{.Digest}}' > "$stage/images.txt"
 resume
 trap - EXIT

@@ -3,10 +3,11 @@
   homebrew = {
     enable = true;
     onActivation = {
-      # Refresh Homebrew and upgrade managed packages on each rebuild activation.
+      # Rebuilding Nix must not implicitly update unrelated Homebrew packages.
+      # Homebrew remains a declared but independently versioned macOS boundary.
       cleanup = "none";
-      autoUpdate = true;
-      upgrade = true;
+      autoUpdate = false;
+      upgrade = false;
     };
     taps = [
       "chainguard-dev/tap"

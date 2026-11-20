@@ -1,4 +1,4 @@
-# nas1 TrueNAS to NixOS migration
+# NAS1 operations and recovery
 
 `nixosConfigurations.nas1` runs the NAS on NixOS 26.11 with Linux 6.18.62
 and OpenZFS 2.4.4. Installation replaced only the existing 16 GB boot device.
@@ -108,12 +108,12 @@ change ownership, permissions, ACL type, or extended attributes as an import fix
 Build and package locally, without connecting to the NAS:
 
 ```console
-bash scripts/build-nas1-docker.sh
+mise run build:nas1
 ```
 
 This reuses the existing Docker Linux build cache and writes the system and
 disk-installer paths, evaluated safety checks, and a portable Nix package cache
-under `artifacts/nas1/`. It does not perform an installation.
+under `artifacts/nas1/build/`. It does not perform an installation.
 
 Use a pinned [nixos-anywhere](https://github.com/nix-community/nixos-anywhere)
 to boot a temporary installer in RAM, then run only the reviewed boot-disk
@@ -138,34 +138,7 @@ existing pool by GUID with `altroot=/mnt` and mounts only `Data/documents`.
 This retains TrueNAS’s temporary mount prefix without changing stored dataset
 mountpoints. Do not add the existing `Data` pool to disko.
 
-## Completed cutover procedure
-
-1. Finish the read-only rsync checksum comparison with exit code 0 and no missing
-   or changed regular files. If there are differences, resolve them and repeat
-   the comparison before replacing the OS.
-2. Verify the IPMI console is usable and stage a verified TrueNAS 24.10.0.2
-   recovery installer. Confirm the local recovery files are readable.
-3. Arrange downtime, stop SMB/NFS and other writers, and complete a final backup
-   check. Save a ZFS snapshot of the documents and refresh recovery metadata if
-   anything changed. A snapshot on the same pool is not an off-box backup.
-4. Cleanly export `Data`. TrueNAS's system dataset resides on this pool, so first
-   account for its open files and middleware services; do not force an export
-   just because it is busy. A normal shutdown into a recovery installer is the
-   fallback if a clean export cannot be arranged with the RAM boot path.
-5. Run only the `kexec` phase first. Confirm the temporary installer is reachable,
-   all five data disks are present, no pool is imported, and the boot disk still
-   matches both the serial and exact byte size above.
-6. Before the destructive disk phase, approve replacing **only** the identified
-   16 GB boot device. Recheck the generated disko script and its target. Never
-   substitute an unstable name such as `/dev/sda`.
-7. Install the prebuilt system and reboot. Confirm SSH, networking, disk space,
-   and ZFS module availability before importing any pool.
-
-The user authorized the boot-device replacement, and this procedure completed
-on November 11, 2026. The initial bootstrap left the pool unimported; the final
-configuration enables the verified documents service.
-
-## First import and completion
+## Verify the existing pool during recovery
 
 After a clean export on TrueNAS, inspect available pools, then import the verified
 GUID without mounting datasets and without writing to the pool:
@@ -204,9 +177,9 @@ America/Chicago. It is a mirror, not a versioned backup, and does not preserve
 Unix ownership, modes, or extended attributes. The private recovery metadata
 archive supplements it. Retain that archive and the pre-migration snapshot.
 
-Repository source is also staged at `/etc/nixos` on the NAS. Rebuilds should use
-this flake; the explicit Docker build script can prepare Linux outputs locally.
-The disk installation script is destructive and is not needed for rebuilds.
+Repository source is staged at `/etc/nixos` on the NAS. Follow the
+[remote rebuild procedure](../README.md#build-and-update-the-servers) for updates.
+The disk installer is only for boot-device installation and recovery.
 
 ## Rex remote terminals
 

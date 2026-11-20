@@ -1,0 +1,93 @@
+[tasks."build:nas1"]
+description = "Build the NAS1 system and export offline recovery artifacts"
+run = "mise run _linux-build nas1"
+
+[tasks."build:tycho-iso"]
+description = "Build the Tycho USB image and checksum"
+run = "mise run _linux-build tycho-iso"
+
+[tasks."check:hosts"]
+description = "Validate and build the NAS1 and Tycho configurations"
+run = "mise run _linux-build check"
+
+[tasks._linux-build]
+hide = true
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+target=${1:?Build target required}
+case "$target" in
+  nas1) output="$PWD/artifacts/nas1/build" ;;
+  tycho-iso) output="$PWD/artifacts/tycho" ;;
+  check) output= ;;
+  *) exit 2 ;;
+esac
+
+# Copy only the flake source. The builder cannot see the rest of the checkout,
+# including Git metadata and NAS recovery credentials under artifacts/.
+source_dir=$(mktemp -d /tmp/nix-hosts-build.XXXXXX)
+trap 'rm -rf "$source_dir"' EXIT
+tar --exclude='__pycache__' --exclude='*.py[co]' -cf - -T installer/source-files \
+  | tar -xf - -C "$source_dir"
+set -- --mount "type=bind,source=$(cd "$source_dir" && pwd -P),target=/src,readonly"
+if [ -n "$output" ]; then
+  mkdir -p "$output"
+  if [ "$target" = nas1 ]; then chmod 700 "$output"; fi
+  set -- "$@" --mount "type=bind,source=$output,target=/output"
+fi
+
+# A Linux store avoids case collisions when building an ISO on macOS.
+docker run --rm --platform linux/amd64 --workdir /src "$@" \
+  --mount type=volume,source=tycho-nix-build-cache,target=/nix \
+  nixos/nix@sha256:f9823365cb4dbd4f1c056957d94e415b5bae73dfee33cf4da84c98a2f4ce9577 \
+  sh -eu -c '
+    export NIX_CONFIG="experimental-features = nix-command flakes"
+    build() {
+      nix build --no-write-lock-file --option sandbox false --option filter-syscalls false "$@"
+    }
+    case "$1" in
+      nas1)
+        nix eval --impure --json --no-write-lock-file --expr '\''
+          let f = builtins.getFlake "path:/src";
+          in import /src/tests/nas1.nix { host = f.nixosConfigurations.nas1; }'\'' \
+          > /output/evaluation-checks.json
+        host="path:/src#nixosConfigurations.nas1.config.system.build"
+        system=$(build --no-link --print-out-paths "$host.toplevel")
+        disk=$(build --no-link --print-out-paths "$host.diskoScript")
+        printf "%s\n" "$system" > /output/system-path.txt
+        printf "%s\n" "$disk" > /output/disko-path.txt
+        cp "$disk" /output/disko-reviewed.sh
+        nix path-info --closure-size --json --json-format 1 "$system" > /output/system-size.json
+        nix copy --to "file:///output/nix-cache?compression=zstd" "$system" "$disk"
+        ;;
+      tycho-iso)
+        build --print-build-logs --out-link /tmp/tycho-iso path:/src#packages.x86_64-linux.tycho-iso
+        set -- /tmp/tycho-iso/iso/*.iso
+        if [ "$#" -ne 1 ] || [ ! -f "$1" ]; then
+          printf "%s\n" "Expected exactly one ISO in the Tycho build output." >&2
+          exit 1
+        fi
+        iso=${1##*/}
+        cd /output
+        cp -- "$1" .
+        sha256sum -- "$iso" > "$iso.sha256"
+        chmod a+r -- "$iso" "$iso.sha256"
+        ;;
+      check)
+        nix eval --impure --json --no-write-lock-file --expr '\''
+          let f = builtins.getFlake "path:/src";
+              inherit (f.nixosConfigurations) nas1 tycho tycho-installer;
+          in {
+            nas1 = import /src/tests/nas1.nix { host = nas1; };
+            tycho = import /src/tests/tycho.nix { host = tycho; installer = tycho-installer; };
+            bookorbit = import /src/tests/bookorbit.nix { inherit nas1 tycho; };
+            tailnet = import /src/tests/tailnet-services.nix { host = tycho; };
+          }'\''
+        build --no-link path:/src#nixosConfigurations.tycho.config.system.build.toplevel \
+          path:/src#nixosConfigurations.nas1.config.system.build.toplevel
+        ;;
+    esac
+  ' sh "$target"
+
+if [ -n "$output" ]; then printf 'Build output: %s\n' "$output"; fi
+'''

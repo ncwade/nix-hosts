@@ -98,13 +98,13 @@ nix eval --impure --json --expr 'let f = builtins.getFlake ("path:" + toString .
 From the nix-hosts checkout on this Mac, with Docker Desktop running:
 
 ```sh
-bash scripts/build-tycho-iso-docker.sh
+mise run build:tycho-iso
 cd artifacts/tycho
 shasum -a 256 -c tycho-installer-x86_64.iso.sha256
 ```
 
-The script uses the official Nix 2.34.9 x86_64 container, pinned by digest, and a
-task-specific `tycho-nix-build-cache` Docker volume. Source is mounted read-only;
+The task uses the official Nix 2.34.9 x86_64 container, pinned by digest, and the
+shared `tycho-nix-build-cache` Docker volume. Source is mounted read-only;
 only the ISO and checksum are written into `artifacts/tycho`. The volume keeps
 downloaded dependencies for later builds; remove it with
 `docker volume rm tycho-nix-build-cache` when no build is running if no longer needed.
@@ -272,18 +272,8 @@ fresh installation.
 ## Updates, backups, and verification
 
 The USB installs a writable source snapshot at `/etc/nixos`. Keep this repository
-as the source of truth; sync reviewed changes there before rebuilding. Source
-evaluation of the personal server uses nixpkgs; the other flake outputs reference
-private user/employer inputs, so full all-system checks need access to those inputs.
-
-On Tycho:
-
-```sh
-sudo nixos-rebuild build --flake path:/etc/nixos#tycho
-sudo nixos-rebuild test --flake path:/etc/nixos#tycho
-# After verifying SSH, Tailscale, and (when enabled) the library:
-sudo nixos-rebuild switch --flake path:/etc/nixos#tycho
-```
+as the source of truth and follow the [remote rebuild procedure](../README.md#build-and-update-the-servers).
+Full all-system checks also need access to the private employer input.
 
 For a failed system update, select a previous generation in the boot menu or use
 `sudo nixos-rebuild switch --rollback`. A system rollback does not undo application

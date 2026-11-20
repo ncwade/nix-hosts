@@ -1,13 +1,13 @@
-# Tycho Tailscale Services migration
+# Tycho Tailscale Services
 
 The repository and live Tycho configuration select **services**. BookOrbit,
 Home Assistant, and Grafana use their original URLs through the tagged shared
 host. The old application nodes are stopped and retained as `*-legacy` for rollback.
-The steps below document the completed migration and recovery procedure.
+The steps below cover enrollment on a replacement host and rollback.
 
 ## Ownership and preserved behavior
 
-| Address | Local destination | New owner |
+| Address | Local destination | Service |
 | --- | --- | --- |
 | `bookorbit.tailf3d82.ts.net` | `127.0.0.1:3000` | `svc:bookorbit` |
 | `home-assistant.tailf3d82.ts.net` | `127.0.0.1:8123` | `svc:home-assistant` |
@@ -25,115 +25,33 @@ neither DNS settings nor subnet routes. Tycho's ordinary Tailscale daemon, SSH,
 Rex, and original BookOrbit redirect remain separate. `idp` retains its existing
 tsidp node and IP-scoped identity grants. NAS1 is not changed.
 
-## Prepare and enroll
+## Enroll a replacement service host
 
-1. Read Tycho's current `/etc/nixos`. Stage a private copy and apply only this
-   migration's changes; do not overwrite newer live configuration with an older
-   local checkout. Keep `phase = "prepare"`. Run the Nix phase tests and build:
+Restore the application's data and use the reviewed Tycho flake. The shared
+`tailnet-services` daemon starts separately from Tycho's own Tailscale daemon.
+In the Tailscale console, confirm that `tag:tycho-services` is owned by
+`autogroup:admin`, then enroll only the dedicated socket on Tycho:
 
-   ```sh
-   nix eval --impure --json --expr 'let f = builtins.getFlake ("path:" + toString ./.); in import ./tests/tailnet-services.nix { host = f.nixosConfigurations.tycho; }'
-   sudo bash scripts/deploy-tailnet-services.sh
-   ```
+```sh
+sudo tailscale --socket=/run/tailnet-services/tailscaled.sock up \
+  --hostname=tycho-services --advertise-tags=tag:tycho-services \
+  --accept-dns=false --accept-routes=false
+sudo tailscale --socket=/run/tailnet-services/tailscaled.sock status --json
+```
 
-   The deployment takes the existing monitoring and media locks, retains the old
-   source and system generation, and compares application/access unit files before
-   activation. A mismatch requires reconciling source first. Backups must finish
-   before deployment. During Services cutover, an existing import may continue
-   only when its unit is identical; the app and storage units must also match.
-   Import/backup timers are paused before the build and comparison and restored
-   on exit. NixOS activation can restart enabled timers; the deployment locks and
-   unchanged active-unit checks protect the cutover.
+Confirm `Self.Tags` contains the tag, then start `tailnet-services-publish` and
+approve the new host for all three existing Services in the console. Verify TLS,
+HTTP redirects, app sign-in, and access from Tycho as well as a client. Existing
+Service definitions and grants determine which users can reach the endpoints.
 
-2. In the Tailscale admin console, merge this tag owner into the existing policy:
-
-   ```json
-   "tagOwners": { "tag:tycho-services": ["autogroup:admin"] }
-   ```
-
-   Preserve all existing policy entries. Do not tag Tycho, NAS1, `idp`, or user
-   devices. On Tycho, enroll only the dedicated socket:
-
-   ```sh
-   sudo tailscale --socket=/run/tailnet-services/tailscaled.sock up \
-     --hostname=tycho-services --advertise-tags=tag:tycho-services \
-     --accept-dns=false --accept-routes=false
-   sudo tailscale --socket=/run/tailnet-services/tailscaled.sock status --json
-   ```
-
-   Complete the displayed login. Confirm `Self.Tags` contains the intended tag.
-   This step needs no long-lived API key or credential in Nix. The prepare unit
-   clears Serve mappings on **this socket only**, including on a return from
-   `services`, so preparation cannot accidentally keep publishing persisted routes.
-
-3. Record the old app nodes' IDs, IPs, names, and current access policy privately
-   for rollback. Confirm their identity directories are retained and recent app
-   backups succeeded. Do not delete old nodes or their state.
-
-## Cut over the names
-
-This is a short maintenance window: an old node and a Service cannot be assumed
-to own the same MagicDNS name concurrently. Schedule it when no user is reading
-or changing the applications.
-
-1. Rename the three old nodes in the admin console to `bookorbit-legacy`,
-   `home-assistant-legacy`, and `grafana-legacy`. Record these as explicit machine
-   names so the old daemon's hostname does not reclaim the canonical name.
-2. Define Services `bookorbit`, `home-assistant`, and `grafana`, each with endpoint
-   ports `tcp:80` and `tcp:443`. Confirm each exact canonical DNS name; stop if
-   Tailscale reports a collision or assigns a suffix. Record their virtual IPs.
-3. Give the same intended readers access to each new Service. Derive the source
-   identities from the existing app access policy; do not broaden access as part
-   of this migration. Preserve the existing tsidp application-capability grant.
-   For example, a grant restricted to the owner is:
-
-   ```json
-   { "src": ["ncwade@github"],
-     "dst": ["svc:bookorbit", "svc:home-assistant", "svc:grafana"],
-     "ip": ["tcp:80", "tcp:443"] }
-   ```
-
-   Ensure Tycho's existing identity can reach these endpoints for health checks
-   and server-side webhooks. Authorize only `tag:tycho-services` to host the three
-   Services, either by reviewing advertisements manually or by merging:
-
-   ```json
-   "autoApprovers": { "services": {
-     "svc:bookorbit": ["tag:tycho-services"],
-     "svc:home-assistant": ["tag:tycho-services"],
-     "svc:grafana": ["tag:tycho-services"]
-   } }
-   ```
-
-4. Before activation, advertise the six endpoints using the dedicated socket and
-   approve `tycho-services` for all three Services. For each application, run
-   `tailscale --socket=/run/tailnet-services/tailscaled.sock serve --service=svc:NAME --https=443 http://127.0.0.1:PORT`
-   and the equivalent `--http=80` mapping to its redirect port (BookOrbit 3001,
-   Grafana 3003, Home Assistant 8124). Wait for certificate issuance and successful
-   HTTPS responses; do not bypass TLS verification.
-   In the staged configuration set `phase = "services"`, then run the deployment
-   script again. It stops the six old daemon/publication units, retains all their
-   state, and publishes the three Services through the shared tagged host. If
-   approving during activation instead, complete approvals before its health gate times out.
-   Local publication alone does not prove control-plane approval or access.
-5. The script verifies HTTPS and redirects with legacy nodes stopped, then makes
-   the generation persistent. From Luna and the iPhone separately, verify DNS
-   resolves to the recorded Service IPs, HTTPS certificates, HTTP redirects,
-   BookOrbit reading, HA/Grafana sign-in, HA mobile access, and Grafana-to-HA
-   notification delivery. Do not operate the thermostat to test connectivity.
-   Verify SSH and Rex still work. Old Linux clients before 1.94 need accepted
-   routes enabled to reach Services; current clients do not.
-6. Verify existing backup success and schedules, plus the backup regression tests
-   for absent legacy units. Run a fresh backup and restore drill during an idle
-   maintenance window; do not interrupt an active import. Record actual results
-   here. Keep old node identities for the rollback window;
-   deleting them is a separate cleanup, not part of this migration.
+For configuration updates, use the [remote rebuild procedure](../README.md#build-and-update-the-servers).
+Check the three HTTPS endpoints, the IdP, SSH, and Rex during `nixos-rebuild test`.
 
 ## Rollback
 
-Source, runtime, and control-plane DNS are separate. A failed deployment restores
-the previous runtime generation automatically, but cannot restore console names
-or policy. Retain console access throughout the cutover.
+Reverting a NixOS generation restores the configuration on Tycho. Restore DNS
+names and access rules separately in the Tailscale console. Keep console access
+available while making changes.
 
 1. Stop `tailnet-services-publish` and `tailnet-services` to stop Service traffic.
    Merely stopping the publisher is insufficient: Serve mappings are persistent
@@ -143,7 +61,7 @@ or policy. Retain console access throughout the cutover.
    deletion is required, review it separately and retain its definition and IPs;
    recreation is not guaranteed to preserve its virtual IPs.
 3. Restore the saved source/system generation, or set `phase = "legacy"` and
-   deploy it. The original daemons reuse their retained identities. Confirm the
+   rebuild Tycho. The original daemons reuse their retained identities. Confirm the
    old DNS/IP mappings and repeat HTTPS, SSO, mobile, SSH, and Rex checks.
 
 ## Backup and recovery

@@ -2,7 +2,7 @@
 
 Shared Home Manager profiles live in `ncwade/nix-dotfiles`; this repository assembles the Darwin desktop and CLI machine profiles. Employer host
 names, local user names, Git identity rules, and employer-specific modules live
-in private repositories under `ncwade`.
+in repositories under `ncwade`; the employer repository is private.
 
 The `defense-unicorns` input points to `ncwade/nix-config-defense-unicorns` over
 SSH. The parent lock file pins the employer repository to an exact commit.

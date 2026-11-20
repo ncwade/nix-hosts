@@ -107,19 +107,6 @@ Phone setup:
    with the iPhone locked. The direct Home Assistant notification test alone does
    not verify the Grafana webhook route.
 
-For the existing Tycho transition, first activate the separately staged
-`/home/ncwade/grafana-alerting-20261115/scripts/deploy-grafana-alerting.py`
-with `notify.mobile_app_iphone_personal`. That transitional bundle keeps ntfy
-running. After the live Grafana firing/recovery phone tests pass, run the final
-bundle's `sudo python3 scripts/retire-ntfy.py --phone-delivery-confirmed`.
-The retirement helper checks the expected live source, all three queries and
-service health, builds before activation, preserves active connector jobs, and
-verifies that the ntfy listener and Tailscale port 8443 are gone. It changes only
-the alert monitor source in the live configuration and retains recovery copies
-under `/var/lib/nixos-source-backups/ntfy-retirement-*`. It rolls back on failed
-activation or validation. Do not pass the confirmation flag before observing
-both messages on the phone.
-
 The random webhook ID is generated once under root-only `secrets/`; it is never
 committed or put in the Nix store. Generated Grafana provisioning has mode 0640
 and group 472; the generated HA package has mode 0600. The webhook accepts local
@@ -321,18 +308,10 @@ both the include list and the Grafana queries.
 
 ## Deploy and update
 
-Read the current `/etc/nixos` first and stage a copy plus these feature files.
-Do not replace Tycho's live source with a stale local checkout. Import
-`hosts/tycho/monitoring.nix`, then run as root on Tycho:
-
-```sh
-bash /path/to/staged-source/scripts/deploy-home-monitoring.sh
-```
-
-The script builds, tests with health checks, switches, and copies only this
-feature into `/etc/nixos`. It verifies that any active library import retains an identical service unit and
-restores the previous runtime NixOS generation on an activation failure. Runtime data is never
-deleted by rollback. Before upgrades, back up all application state. Source
+Tycho's flake already imports `hosts/tycho/monitoring.nix`. Follow the
+[remote rebuild procedure](../README.md#build-and-update-the-servers). Before
+switching, verify Home Assistant, Grafana, InfluxDB, and BookOrbit. Back up
+application state before upgrades that may change it. Source
 changes to the HA package take effect on service restart; UI authentication and
 entity registries remain in persistent storage. Keep changes to managed YAML in
 source: deployment replaces these files. HA 2026.11 HTTP settings live in its
@@ -345,8 +324,8 @@ an unconfirmed HTTP trial reverting.
 
 ## Backup and restore
 
-Use the supplied `scripts/backup-home-monitoring.sh` as root on Tycho. It pre-copies
-state into a private staging directory, briefly stops this stack and its two Tailscale identities for a consistent
+Start `home-monitoring-backup.service` for an on-demand backup on Tycho. It copies
+state into a private staging directory, briefly stops the stack for a consistent
 copy, resumes it, then uses the existing encrypted `bookorbit-restic` NAS1
 repository. It tags snapshots `home-monitoring` and retains 7 daily, 4 weekly,
 and 6 monthly backups independently by path/tag. NAS1's existing offsite sync
@@ -359,7 +338,7 @@ manager. The staging copy contains live credentials and must stay root-only.
 A backup of source files alone cannot restore tokens, accounts or history.
 
 ```sh
-sudo bash /etc/nixos/scripts/backup-home-monitoring.sh
+sudo systemctl start home-monitoring-backup.service
 sudo bookorbit-restic snapshots --tag home-monitoring
 sudo bookorbit-restic check --read-data
 sudo bookorbit-restic restore SNAPSHOT --target /var/lib/home-monitoring-restore

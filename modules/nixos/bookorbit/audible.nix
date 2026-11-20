@@ -58,7 +58,7 @@ in {
         "/var/lib/libation/libation-master.key"
       ];
       path = [ pkgs.coreutils pkgs.util-linux cli pkgs.python3 ];
-      environment.AUDIBLE_HEALTH_CHECK = toString ./audible-health.py;
+      environment.AUDIBLE_HEALTH_CHECK = "${./audible-health.py}";
       serviceConfig = {
         Type = "oneshot";
         UMask = "0077";

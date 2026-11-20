@@ -60,36 +60,28 @@ The app binds to `127.0.0.1:3000`; PostgreSQL binds to `127.0.0.1:5433`.
 Host networking lets the app reach the tailnet's OIDC issuer through the host's
 DNS and routing. Neither port is opened in the firewall.
 
-During the Tailscale Services preparation stage, a dedicated userspace node publishes
-`https://bookorbit.tailf3d82.ts.net`. Its HTTPS listener proxies to BookOrbit;
+The shared Tailscale service host publishes `https://bookorbit.tailf3d82.ts.net`.
+Its HTTPS listener proxies to BookOrbit;
 `http://bookorbit` redirects to the full HTTPS name through a loopback-only nginx
 listener on port 3001. HTTPS is required for the browser's OIDC PKCE crypto API,
 even though Tailscale already encrypts transport. Bare `https://bookorbit` cannot
 use the public certificate for the full tailnet name.
 
-The original `https://tycho.tailf3d82.ts.net` address redirects to the new address,
+The original `https://tycho.tailf3d82.ts.net` address redirects to the service,
 preserving paths and queries. Tycho's machine identity and Rex port 7297 remain
-independent; future applications can have separate service identities. Neither
-node uses Funnel. Both the Apple client and browser need tailnet connectivity
+independent. Both the Apple client and browser need tailnet connectivity
 for server access. Downloads work offline according to the client's capabilities.
 
-On first deployment, obtain the BookOrbit node enrollment URL from
-`journalctl -u bookorbit-tailnet-serve` and sign in to Tailscale. The separate
-daemon uses `/run/bookorbit-tailnet/tailscaled.sock`; use
-`sudo tailscale --socket=/run/bookorbit-tailnet/tailscaled.sock status` to inspect
-it. The machine's ordinary `tailscale status` manages Tycho instead.
-
-For the transition to a shared tagged host, see [Tailscale Services](tailscale-services.md).
-In the `services` phase, `svc:bookorbit` owns the same address and the old daemon
-is stopped; its state is retained for rollback. Fresh Services installations
-re-enroll the shared host after recovery instead of restoring a per-app identity.
+For first enrollment or recovery, follow the shared host instructions in
+[Tailscale Services](tailscale-services.md). The old per-app daemon is stopped
+and its identity is retained for rollback.
 
 ## Deploy and provision
 
-Build first with `bash scripts/check-bookorbit-docker.sh`. Copy the reviewed
-source to each host's `/etc/nixos`, preserving a backup of its previous contents.
-Use `nixos-rebuild build`, then `test`, then `switch` for the matching host.
-Do not run either host's disk installer.
+Tycho's flake declares BookOrbit and NAS1's flake declares its backup receiver.
+Run `mise run check:hosts` to build both, then follow the
+[remote rebuild procedure](../README.md#build-and-update-the-servers).
+Wait for active BookOrbit imports and backups to finish before activating Tycho.
 
 After deploying NAS1, it creates this repository directory inside the existing
 exported and backed-up documents dataset:

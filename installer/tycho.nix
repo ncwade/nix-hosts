@@ -8,19 +8,12 @@
 }:
 
 let
+  root = ../.;
+  sourceEntries = lib.splitString "\n" (lib.removeSuffix "\n" (builtins.readFile ./source-files));
   # Only repository configuration goes on the USB, never .git or local output.
   configSource = lib.fileset.toSource {
-    root = ../.;
-    fileset = lib.fileset.unions [
-      ../flake.nix
-      ../flake.lock
-      ../hosts
-      ../programs
-      ../scripts
-      ../installer
-      ../docs
-      ../README.md
-    ];
+    inherit root;
+    fileset = lib.fileset.unions (map (entry: root + "/${entry}") sourceEntries);
   };
   installTycho = pkgs.writeShellApplication {
     name = "install-tycho";

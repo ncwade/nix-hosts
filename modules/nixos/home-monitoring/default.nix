@@ -14,6 +14,8 @@ let
   };
 in {
   imports = [ ./tailnet.nix ];
+  # Backups follow the activated generation, not a manually copied checkout.
+  environment.etc."home-monitoring/source".source = source;
   virtualisation.docker.enable = true;
   environment.systemPackages = [ pkgs.docker-compose pkgs.python3 ];
   systemd.tmpfiles.rules = [ "d /var/lib/home-monitoring 0711 root root -" ];

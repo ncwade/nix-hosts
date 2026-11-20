@@ -1,11 +1,14 @@
 # nix-hosts
 
-Private machine configuration assembled from:
+Machine configuration assembled from:
 
 - [nix-dotfiles](https://github.com/ncwade/nix-dotfiles): Home Manager profiles, user programs, skills, and wiki integration.
 - [nix-config-defense-unicorns](https://github.com/ncwade/nix-config-defense-unicorns): employer host definitions and Git identity rules.
 
-This repository owns NixOS, nix-darwin, system preferences, Homebrew, per-machine accounts, and provisioning. Both private Git inputs select `main` and are pinned to exact commits in `flake.lock`; access to them is required for a fresh evaluation of configurations that use them.
+This repository owns NixOS, nix-darwin, system preferences, Homebrew, per-machine accounts, and provisioning. Both Git inputs select `main` and are pinned to exact commits in `flake.lock`. `nix-hosts` and `nix-dotfiles` are public; the employer flake is private. Darwin evaluation needs access to that private input.
+
+The [declarative configuration review](docs/declarative-review.md) records the
+remaining runtime and provisioning boundaries, along with findings from the host review.
 
 ## Tycho personal server
 
@@ -20,15 +23,14 @@ NAS1's existing SMB documents share mounts on demand at `/mnt/nas1/docs` for
 
 Thermostat monitoring uses Home Assistant, InfluxDB, and Grafana on Tycho.
 See [setup, data quality, and recovery](docs/home-monitoring.md).
-The [Tailscale Services migration](docs/tailscale-services.md) consolidates the
-three application nodes behind a shared tagged host, with preparation and rollback
-stages that preserve the existing URLs and sign-in.
+[Tailscale Services](docs/tailscale-services.md) publishes the three applications
+through a shared tagged host and documents enrollment and recovery.
 
 Build its dedicated USB installer on this Mac using the existing Docker Desktop
 Linux environment (avoids case-sensitivity problems in the Mac's Nix store):
 
 ```console
-bash scripts/build-tycho-iso-docker.sh
+mise run build:tycho-iso
 ```
 
 Flash `artifacts/tycho/tycho-installer-x86_64.iso` to USB and boot with Ethernet
@@ -45,12 +47,12 @@ on, then connect to `ncwade@tycho.local`. Secure Boot must already be disabled;
 firmware changes can still require a temporary display. See the [installation and setup guide](docs/tycho.md)
 for tailnet enrollment, backups, and rebuilds.
 
-## nas1 NAS migration
+## NAS1 storage server
 
 `nixosConfigurations.nas1` runs the NAS on its existing 16 GB boot device.
 The five data drives are preserved, and only `/mnt/Data/documents` is mounted
 and shared at `smb://nas1/docs`. The existing rsync.net backup runs daily at
-midnight Central. See the [migration and recovery guide](docs/nas1.md) for
+midnight Central. See the [NAS1 operations and recovery guide](docs/nas1.md) for
 preservation checks, operation, and recovery.
 
 ## Use
@@ -62,6 +64,42 @@ sudo darwin-rebuild switch --flake .#luna
 ```
 
 Employer host names come from the private employer flake. The `homeConfigurations.mvm` output assembles the VM user profile; `scripts/mvm-home-manager.sh` targets this checkout at `~/src/github.com/ncwade/nix-hosts`.
+
+## Build and update the servers
+
+With Docker running, `mise run check:hosts` evaluates and builds both server
+configurations. `mise run build:nas1` exports offline recovery artifacts to
+`artifacts/nas1/build/`, and `mise run build:tycho-iso` writes the installer and
+checksum to `artifacts/tycho/`. The tasks use a pinned x86_64 Linux builder.
+On x86_64 Linux you can also build the system directly with Nix:
+
+```console
+nix build 'path:.#nixosConfigurations.nas1.config.system.build.toplevel'
+nix build 'path:.#nixosConfigurations.tycho.config.system.build.toplevel'
+```
+
+Both server flakes already declare their complete roles. Tycho runs BookOrbit
+and home monitoring. NAS1 runs the documents share, offsite backup, and
+BookOrbit backup receiver. To deploy, reconcile a reviewed copy of the complete
+source with `/etc/nixos` on the target, then run a remote NixOS rebuild. Keep a
+copy of the previous source outside `/etc/nixos`. Wait for active backups and
+imports to finish before testing or switching, and choose a window away from
+scheduled jobs.
+
+```sh
+# Set both values for the server you are updating:
+host=tycho
+remote=ncwade@tycho.tailf3d82.ts.net
+# For NAS1: host=nas1; remote=ncwade@192.168.3.63
+ssh -t "$remote" "sudo nixos-rebuild build --flake path:/etc/nixos#$host --no-write-lock-file"
+ssh -t "$remote" "sudo nixos-rebuild test --flake path:/etc/nixos#$host --no-write-lock-file"
+# Verify the host and applications before making the generation persistent.
+ssh -t "$remote" "sudo nixos-rebuild switch --flake path:/etc/nixos#$host --no-write-lock-file"
+```
+
+For Tycho, check a fresh SSH connection, BookOrbit, Home Assistant, and Grafana.
+For NAS1, check SSH, the documents mount, SMB access, and the backup receiver.
+The ISO and disk installer are for recovery or installation only.
 
 Personal-wiki support is enabled only on `luna`. See the [wiki documentation in nix-dotfiles](https://github.com/ncwade/nix-dotfiles/blob/main/docs/personal-wiki.md).
 
