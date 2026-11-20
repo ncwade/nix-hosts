@@ -299,14 +299,25 @@ marker and restart to re-enable SSO. Full rollback also requires the matching
 source/configuration snapshot; NixOS generation rollback alone does not undo
 persistent authentication data.
 
-## Add Ecowitt later
+## Ecowitt station on Tycho
 
-Use HA's built-in Ecowitt integration when the hardware arrives. Inspect the
-created entities, assign stable `sensor.ecowitt_<location>_temperature` and
-`..._humidity` names, normalize temperatures to °F, then explicitly add the chosen
-entities to the Influx include list. Reuse `home_state`, the bucket, read-only
-datasource, and timezone. Do not export all HA entities or control entities.
-No Ecowitt integration, ports, credentials, or speculative devices are installed.
+The HP2561BU Pro sends an Ecowitt-format POST every 60 seconds to
+`http://192.168.3.122:8199/ecowitt`. Tycho accepts uploads from
+`192.168.2.122` on `enp191s0` and forwards them to the Home Assistant
+Ecowitt webhook on loopback. Preserve both LAN addresses when changing DHCP.
+Deploy `hosts/tycho/ecowitt-upload.nix` alongside `hosts/tycho/monitoring.nix`.
+
+The receiver loads `/var/lib/home-monitoring/secrets/ecowitt-target.conf`
+as a systemd credential. Restore this root-owned, mode-0600 file together with
+Home Assistant's integration state. If you recreate the Ecowitt integration,
+use its new webhook path in the file's single nginx directive,
+`proxy_pass http://127.0.0.1:8123/api/webhook/<webhook-id>;`, and restart
+`ecowitt-upload.service`. Keep the actual webhook ID on Tycho.
+
+The thermostat dashboard compares temperature and humidity from the Honeywell
+thermostat, console, channel 1, and WH45. The InfluxDB include list selects the
+six Ecowitt entities explicitly. If Home Assistant entity IDs change, update
+both the include list and the Grafana queries.
 
 ## Deploy and update
 

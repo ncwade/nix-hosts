@@ -1,4 +1,4 @@
 { ... }:
 {
-  imports = [ ../../modules/nixos/home-monitoring ];
+  imports = [ ../../modules/nixos/home-monitoring ./ecowitt-upload.nix ];
 }

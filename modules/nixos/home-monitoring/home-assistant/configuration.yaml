@@ -16,7 +16,13 @@ influxdb:
   include:
     entity_globs:
       - sensor.tcc_*
-      # Add explicitly selected sensor.ecowitt_* entities here later.
+    entities:
+      - sensor.hp2561bu_pro_v2_1_4_indoor_temperature
+      - sensor.hp2561bu_pro_v2_1_4_temperature_1
+      - sensor.hp2561bu_pro_v2_1_4_wh45_temperature
+      - sensor.hp2561bu_pro_v2_1_4_indoor_humidity
+      - sensor.hp2561bu_pro_v2_1_4_humidity_1
+      - sensor.hp2561bu_pro_v2_1_4_wh45_humidity
   ignore_attributes:
     - sampled_at
     - friendly_name
