@@ -100,7 +100,10 @@
       nixosConfigurations.tycho-installer = tychoInstaller;
       packages = nixpkgs.lib.genAttrs [ "aarch64-darwin" "x86_64-linux" ] (_: {
         tycho-iso = tychoInstaller.config.system.build.isoImage;
-      });
+      }) // {
+        aarch64-darwin.personal-wiki-provision =
+          (import nixpkgs { system = "aarch64-darwin"; }).callPackage ./programs/personal-wiki-provision { };
+      };
 
       homeConfigurations.mvm = home-manager.lib.homeManagerConfiguration {
         pkgs = linuxPkgs;
@@ -123,9 +126,12 @@
                 nix-dotfiles.homeManagerModules.rex
                 defense-unicorns.homeManagerModules.default
               ];
-              home-manager.users.ncwade.programs.personalWiki = {
-                enable = true;
-                remote = "https://github.com/ncwade/personal-wiki.git";
+              home-manager.users.ncwade = {
+                home.packages = [ self.packages.aarch64-darwin.personal-wiki-provision ];
+                programs.personalWiki = {
+                  enable = true;
+                  remote = "git@github.com:ncwade/personal-wiki.git";
+                };
               };
             }
           ];

@@ -10,6 +10,30 @@ This repository owns NixOS, nix-darwin, system preferences, Homebrew, per-machin
 The [declarative configuration review](docs/declarative-review.md) records the
 remaining runtime and provisioning boundaries, along with findings from the host review.
 
+## Luna personal wiki
+
+From this checkout on Luna, run the following as your normal user with the
+1Password desktop app available and GitHub CLI signed in as a wiki repository
+administrator. Then activate the host configuration.
+
+```sh
+nix run 'path:.#personal-wiki-provision'
+sudo darwin-rebuild switch --flake 'path:.#luna'
+personal-wiki sync
+```
+
+The provisioning command exports the existing Ed25519 key from the Private
+vault item `personal-wiki-luna-deploy` to `~/.ssh/personal-wiki-luna/id_ed25519`
+(mode 0600). It checks the pinned fingerprint, registers the public key on
+`ncwade/personal-wiki` with write access, verifies access to `main`, and updates
+only the wiki checkout. If you registered the public key with write access in
+GitHub's deploy-key settings, use `nix run 'path:.#personal-wiki-provision' -- --registered`.
+Existing GitHub host keys in `~/.ssh/known_hosts` are used for verification.
+
+Subsequent syncs read the local key directly while 1Password is locked. A
+rebuild does not require vault access. Run provisioning again to restore the
+key on this Mac. To revoke access, remove the deploy key from the repository.
+
 ## Tycho personal server
 
 `nixosConfigurations.tycho` manages the Framework Desktop (Ryzen AI Max+ 395,
