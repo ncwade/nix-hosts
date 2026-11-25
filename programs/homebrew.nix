@@ -25,11 +25,13 @@
       "1password"
       # Keep the signed upstream binary for desktop-app integration.
       "1password-cli"
+      "antigravity"
       "beyond-compare"
       "chatgpt"
       # The current nixpkgs source hash is stale, so this derivation cannot build.
       "font-jetbrains-mono"
       "ghostty"
+      "google-gemini"
       "rectangle-pro"
       "signal"
       "slack"
