@@ -18,8 +18,7 @@ builds are exposed through this repository's `darwinConfigurations`.
 
 `homeManagerModules.default` supplies employer Git rules. The personal host
 imports these explicitly to preserve work-repository email selection. Shared
-user profiles contain only the personal identity rules. Personal-wiki support
-remains opt-in on the personal host and disabled on employer hosts.
+user profiles contain only the personal identity rules.
 
 ## Editing and updating
 

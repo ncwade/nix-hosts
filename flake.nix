@@ -18,7 +18,6 @@
 
   outputs =
     {
-      self,
       nixpkgs,
       rex,
       disko,
@@ -110,7 +109,6 @@
         ];
       };
 
-      # Personal wiki is opt-in per device, never part of a shared user profile.
       darwinConfigurations = {
         luna = mkDarwinHost "luna" {
           extraModules = [
@@ -123,10 +121,6 @@
                 nix-dotfiles.homeManagerModules.rex
                 defense-unicorns.homeManagerModules.default
               ];
-              home-manager.users.ncwade.programs.personalWiki = {
-                enable = true;
-                remote = "https://github.com/ncwade/personal-wiki.git";
-              };
             }
           ];
         };

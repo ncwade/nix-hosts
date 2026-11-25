@@ -84,11 +84,11 @@
         "rex": "rex"
       },
       "locked": {
-        "lastModified": 1795611372,
-        "narHash": "sha256-h+Uud6RAfwEQF2goe0r0mFdHaox5jMfIPrhr4xzMSdM=",
+        "lastModified": 1795611912,
+        "narHash": "sha256-89ttSSGZJ9DF/ewdXaqTUHj7MJjtUrXVtXlZCwhIyLY=",
         "ref": "main",
-        "rev": "d8194a92c7a679432824aafc7d5627afb1223f16",
-        "revCount": 52,
+        "rev": "359f2eb351fa78e4ecd4f82d0fddff8be37457c2",
+        "revCount": 53,
         "type": "git",
         "url": "ssh://git@github.com/ncwade/nix-dotfiles.git"
       },

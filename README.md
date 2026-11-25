@@ -2,7 +2,7 @@
 
 Machine configuration assembled from:
 
-- [nix-dotfiles](https://github.com/ncwade/nix-dotfiles): Home Manager profiles, user programs, skills, and wiki integration.
+- [nix-dotfiles](https://github.com/ncwade/nix-dotfiles): Home Manager profiles and user programs.
 - [nix-config-defense-unicorns](https://github.com/ncwade/nix-config-defense-unicorns): employer host definitions and Git identity rules.
 
 This repository owns NixOS, nix-darwin, system preferences, Homebrew, per-machine accounts, and provisioning. Both Git inputs select `main` and are pinned to exact commits in `flake.lock`. `nix-hosts` and `nix-dotfiles` are public; the employer flake is private. Darwin evaluation needs access to that private input.
@@ -100,8 +100,6 @@ ssh -t "$remote" "sudo nixos-rebuild switch --flake path:/etc/nixos#$host --no-w
 For Tycho, check a fresh SSH connection, BookOrbit, Home Assistant, and Grafana.
 For NAS1, check SSH, the documents mount, SMB access, and the backup receiver.
 The ISO and disk installer are for recovery or installation only.
-
-Personal-wiki support is enabled only on `luna`. See the [wiki documentation in nix-dotfiles](https://github.com/ncwade/nix-dotfiles/blob/main/docs/personal-wiki.md).
 
 ## Update user configuration
 
