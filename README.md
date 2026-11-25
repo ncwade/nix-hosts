@@ -2,37 +2,13 @@
 
 Machine configuration assembled from:
 
-- [nix-dotfiles](https://github.com/ncwade/nix-dotfiles): Home Manager profiles, user programs, skills, and wiki integration.
+- [nix-dotfiles](https://github.com/ncwade/nix-dotfiles): Home Manager profiles and user programs.
 - [nix-config-defense-unicorns](https://github.com/ncwade/nix-config-defense-unicorns): employer host definitions and Git identity rules.
 
 This repository owns NixOS, nix-darwin, system preferences, Homebrew, per-machine accounts, and provisioning. Both Git inputs select `main` and are pinned to exact commits in `flake.lock`. `nix-hosts` and `nix-dotfiles` are public; the employer flake is private. Darwin evaluation needs access to that private input.
 
 The [declarative configuration review](docs/declarative-review.md) records the
 remaining runtime and provisioning boundaries, along with findings from the host review.
-
-## Luna personal wiki
-
-From this checkout on Luna, run the following as your normal user with the
-1Password desktop app available and GitHub CLI signed in as a wiki repository
-administrator. Then activate the host configuration.
-
-```sh
-nix run 'path:.#personal-wiki-provision'
-sudo darwin-rebuild switch --flake 'path:.#luna'
-personal-wiki sync
-```
-
-The provisioning command exports the existing Ed25519 key from the Private
-vault item `personal-wiki-luna-deploy` to `~/.ssh/personal-wiki-luna/id_ed25519`
-(mode 0600). It checks the pinned fingerprint, registers the public key on
-`ncwade/personal-wiki` with write access, verifies access to `main`, and updates
-only the wiki checkout. If you registered the public key with write access in
-GitHub's deploy-key settings, use `nix run 'path:.#personal-wiki-provision' -- --registered`.
-Existing GitHub host keys in `~/.ssh/known_hosts` are used for verification.
-
-Subsequent syncs read the local key directly while 1Password is locked. A
-rebuild does not require vault access. Run provisioning again to restore the
-key on this Mac. To revoke access, remove the deploy key from the repository.
 
 ## Tycho personal server
 
@@ -124,8 +100,6 @@ ssh -t "$remote" "sudo nixos-rebuild switch --flake path:/etc/nixos#$host --no-w
 For Tycho, check a fresh SSH connection, BookOrbit, Home Assistant, and Grafana.
 For NAS1, check SSH, the documents mount, SMB access, and the backup receiver.
 The ISO and disk installer are for recovery or installation only.
-
-Personal-wiki support is enabled only on `luna`. See the [wiki documentation in nix-dotfiles](https://github.com/ncwade/nix-dotfiles/blob/main/docs/personal-wiki.md).
 
 ## Update user configuration
 
