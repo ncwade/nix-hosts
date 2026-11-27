@@ -21,8 +21,15 @@
     "sd_mod"
   ];
   boot.kernelModules = [ "kvm-amd" ];
+  boot.kernelParams = [
+    "amd_iommu=off"
+    "amdgpu.gttsize=45056"
+    "ttm.pages_limit=11534336"
+    "ttm.page_pool_size=11534336"
+  ];
   hardware.cpu.amd.updateMicrocode = true;
   hardware.enableRedistributableFirmware = true;
+  hardware.graphics.enable = true;
 
   boot.loader.systemd-boot.enable = true;
   boot.loader.systemd-boot.configurationLimit = 10;

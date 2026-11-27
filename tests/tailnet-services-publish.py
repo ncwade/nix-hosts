@@ -49,7 +49,7 @@ class PublisherTest(unittest.TestCase):
         endpoints = [args[1:] for args in events if args[1] == 'serve']
         expected = []
         for app, port, redirect in [('bookorbit', 3000, 3001), ('grafana', 3002, 3003),
-                                    ('home-assistant', 8123, 8124)]:
+                                    ('home-assistant', 8123, 8124), ('llm', 8080, 8081)]:
             expected += [['serve', f'--service=svc:{app}', '--https=443', f'http://127.0.0.1:{port}'],
                          ['serve', f'--service=svc:{app}', '--http=80', f'http://127.0.0.1:{redirect}']]
         self.assertEqual(endpoints, expected)

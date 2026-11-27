@@ -56,6 +56,37 @@ assert builtins.all (option: builtins.elem option documents.options) [
 ];
 assert bootstrap.networking.firewall.allowedTCPPorts == [ 22 ];
 assert bootstrap.networking.firewall.interfaces.tailscale0.allowedTCPPorts == [ 22 ];
+assert bootstrap.hardware.graphics.enable;
+assert builtins.all (param: builtins.elem param bootstrap.boot.kernelParams) [
+  "amd_iommu=off"
+  "amdgpu.gttsize=45056"
+  "ttm.pages_limit=11534336"
+  "ttm.page_pool_size=11534336"
+];
+assert bootstrap.personal.llm.enable;
+assert bootstrap.services.llama-cpp.enable;
+assert !bootstrap.services.llama-cpp.openFirewall;
+assert bootstrap.services.llama-cpp.package.version == "1.1.0";
+assert bootstrap.services.llama-cpp.settings.host == "127.0.0.1";
+assert bootstrap.services.llama-cpp.settings.port == 8080;
+assert bootstrap.services.llama-cpp.settings.alias == "inkling-2-mini";
+assert
+  bootstrap.services.llama-cpp.settings.model
+  == "/var/lib/llama-cpp/models/Inkling-2-Mini-UD-Q8_K_XL.gguf";
+assert
+  bootstrap.services.llama-cpp.settings.mmproj
+  == "/var/lib/llama-cpp/models/mmproj-F16.gguf";
+assert bootstrap.services.llama-cpp.settings.jinja == true;
+assert bootstrap.services.llama-cpp.settings.device == "Vulkan0";
+assert bootstrap.services.llama-cpp.settings.load-mode == "none";
+assert bootstrap.services.llama-cpp.settings.flash-attn == "on";
+assert bootstrap.systemd.services.llama-cpp.serviceConfig.PrivateUsers == false;
+assert builtins.elem "render" bootstrap.systemd.services.llama-cpp.serviceConfig.SupplementaryGroups;
+assert
+  bootstrap.systemd.services.llama-cpp.unitConfig.ConditionPathExists == [
+    "/var/lib/llama-cpp/models/Inkling-2-Mini-UD-Q8_K_XL.gguf"
+    "/var/lib/llama-cpp/models/mmproj-F16.gguf"
+  ];
 assert !bootstrap.services.openssh.settings.PasswordAuthentication;
 assert !bootstrap.services.openssh.settings.KbdInteractiveAuthentication;
 assert bootstrap.services.openssh.settings.PermitRootLogin == "no";

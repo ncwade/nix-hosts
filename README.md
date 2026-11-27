@@ -23,7 +23,9 @@ NAS1's existing SMB documents share mounts on demand at `/mnt/nas1/docs` for
 
 Thermostat monitoring uses Home Assistant, InfluxDB, and Grafana on Tycho.
 See [setup, data quality, and recovery](docs/home-monitoring.md).
-[Tailscale Services](docs/tailscale-services.md) publishes the three applications
+Tycho also self-hosts Inkling 2 Mini via `llama.cpp` Vulkan for Tailscale Aperture;
+see [the LLM guide](docs/llm.md).
+[Tailscale Services](docs/tailscale-services.md) publishes the applications
 through a shared tagged host and documents enrollment and recovery.
 
 Build its dedicated USB installer on this Mac using the existing Docker Desktop

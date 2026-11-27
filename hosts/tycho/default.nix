@@ -12,6 +12,7 @@
     ./nas1.nix
     ./rex.nix
     ./monitoring.nix
+    ./llm.nix
     ./tailnet-services.nix
   ];
 

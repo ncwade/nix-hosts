@@ -12,6 +12,7 @@ The steps below cover enrollment on a replacement host and rollback.
 | `bookorbit.tailf3d82.ts.net` | `127.0.0.1:3000` | `svc:bookorbit` |
 | `home-assistant.tailf3d82.ts.net` | `127.0.0.1:8123` | `svc:home-assistant` |
 | `grafana.tailf3d82.ts.net` | `127.0.0.1:3002` | `svc:grafana` |
+| `llm.tailf3d82.ts.net` | `127.0.0.1:8080` | `svc:llm` |
 
 Each Service exposes HTTPS 443 and HTTP 80; the existing loopback nginx listeners
 redirect HTTP to the full HTTPS name and preserve paths and queries. Application

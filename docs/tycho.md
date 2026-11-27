@@ -235,6 +235,14 @@ tailnet HTTPS, OIDC setup, NAS1 backup provisioning, and restore procedures.
 BookOrbit has its own `bookorbit.tailf3d82.ts.net` node. Tycho’s port 443 redirects
 to it; Rex remains on Tycho’s port 7297. `http://bookorbit` is a shortcut to HTTPS.
 
+## Self-hosted LLM (Inkling 2 Mini)
+
+Tycho runs Thinking Machines Lab's Inkling 2 Mini (`UD-Q8_K_XL` + multimodal
+`mmproj-F16.gguf`) via `llama.cpp` Vulkan on `127.0.0.1:8080` and publishes it
+as Tailscale Service `svc:llm` (`https://llm.tailf3d82.ts.net`) for Aperture.
+See [the LLM deployment guide](llm.md) for GTT memory sizing, model downloads,
+and Aperture setup.
+
 ## Rex remote terminals
 
 `hosts/tycho/rex.nix` enables the official Rex NixOS login server, pinned to
