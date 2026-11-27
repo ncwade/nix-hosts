@@ -30,8 +30,8 @@ if p.exists():
     if not backup.exists(): backup.write_text(p.read_text())
     stable = {**pending, 'error':None, 'error_message':None}
 else:
-    stable = {**expected, 'cors_allowed_origins':['https://cast.home-assistant.io'],
-              'login_attempts_threshold':-1, 'ip_ban_enabled':True,
+    stable = {**expected, 'cors_allowed_origins':[],
+              'login_attempts_threshold':5, 'ip_ban_enabled':True,
               'ssl_profile':'intermediate_v6', 'use_x_frame_options':True,
               'created_at':datetime.now(timezone.utc).isoformat(), 'error':None, 'error_message':None}
 p.parent.mkdir(parents=True, exist_ok=True)
