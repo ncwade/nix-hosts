@@ -117,10 +117,16 @@
                 "discord"
                 "steam"
               ];
-              home-manager.users.ncwade.imports = [
-                nix-dotfiles.homeManagerModules.rex
-                defense-unicorns.homeManagerModules.default
-              ];
+              home-manager.users.ncwade = {
+                imports = [
+                  nix-dotfiles.homeManagerModules.rex
+                  defense-unicorns.homeManagerModules.default
+                ];
+                programs.pi = {
+                  enable = true;
+                  apertureBaseUrl = "https://aperture.tailf3d82.ts.net";
+                };
+              };
             }
           ];
         };
