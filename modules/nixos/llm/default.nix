@@ -314,6 +314,9 @@ in
         ];
         PrivateUsers = lib.mkForce false;
         MemoryDenyWriteExecute = lib.mkForce false;
+        PrivateTmp = true;
+        NoNewPrivileges = true;
+        ProtectHome = true;
         ReadOnlyPaths = [ cfg.modelsDir ];
         RestartSec = lib.mkForce 15;
       };
