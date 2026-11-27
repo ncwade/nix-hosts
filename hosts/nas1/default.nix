@@ -48,10 +48,6 @@
       PermitRootLogin = "no";
     };
   };
-  # Existing nas1 public login key; private keys never enter the Nix store.
-  users.users.root.openssh.authorizedKeys.keys = [
-    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICy5wxb5jwVx1YDgXpGBVIF50w/i6R+RjuPfi2/btBLW"
-  ];
 
   # Reserve the existing document ownership before importing any data.
   users.groups.docs.gid = 1001;
