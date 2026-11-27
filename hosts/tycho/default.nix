@@ -39,7 +39,11 @@
   };
   services.openssh = {
     enable = true;
-    # LAN access is required for headless setup before tailnet enrollment.
+    # Allows TCP/22 on all non-loopback interfaces (via networking.firewall.allowedTCPPorts).
+    # Reason: headless LAN bootstrap is required and the DHCP LAN interface name is dynamic
+    # (not statically known in hardware.nix, unlike tailscale0 below).
+    # Pending owner decision: keep blanket openFirewall, scope to a pinned LAN interface/subnet,
+    # or restrict SSH to tailnet-only by setting openFirewall = false.
     openFirewall = true;
     settings = {
       PasswordAuthentication = false;
