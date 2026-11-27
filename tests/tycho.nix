@@ -90,6 +90,12 @@ assert
     "/var/lib/llama-cpp/models/Inkling-2-Mini-UD-Q8_K_XL.gguf"
     "/var/lib/llama-cpp/models/mmproj-F16.gguf"
   ];
+assert bootstrap.personal.gaming.enable;
+assert bootstrap.programs.steam.enable;
+assert !bootstrap.programs.steam.remotePlay.openFirewall;
+assert !bootstrap.programs.steam.dedicatedServer.openFirewall;
+assert !bootstrap.programs.steam.localNetworkGameTransfers.openFirewall;
+assert bootstrap.hardware.graphics.enable32Bit;
 assert !bootstrap.services.openssh.settings.PasswordAuthentication;
 assert !bootstrap.services.openssh.settings.KbdInteractiveAuthentication;
 assert bootstrap.services.openssh.settings.PermitRootLogin == "no";

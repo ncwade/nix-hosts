@@ -13,6 +13,7 @@
     ./rex.nix
     ./monitoring.nix
     ./llm.nix
+    ./gaming.nix
     ./tailnet-services.nix
   ];
 
