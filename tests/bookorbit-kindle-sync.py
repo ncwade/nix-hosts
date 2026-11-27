@@ -2,6 +2,7 @@
 """Offline inventory/completion invariants; no Amazon requests."""
 import importlib.util
 import json
+import os
 from pathlib import Path
 import tempfile
 import shutil
@@ -138,12 +139,14 @@ class SyncTests(unittest.TestCase):
                 (output_dir / "synthetic.azw8").write_bytes(b"synthetic unencrypted KFX")
             client.download.side_effect = download
             imported = []
-            def publish(source, library, receipt_dir):
+            def publish(source, library, receipt_dir, origin="inbox"):
+                self.assertEqual(origin, "sync")
                 identifier = source.stem
                 target = library / f"Kindle [{identifier}]" / "book.epub"
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(source, target)
-                (receipt_dir / f"{identifier}.epub.json").write_text(json.dumps({"sha256":sync.digest(target)}))
+                (receipt_dir / f"{identifier}.epub.json").write_text(
+                    json.dumps({"sha256": sync.digest(target), "origin": origin}))
                 imported.append(identifier)
                 return "imported"
             importer = Mock(); importer.import_file.side_effect = publish
@@ -278,6 +281,247 @@ class SyncTests(unittest.TestCase):
             self.assertEqual([command[:2] for command in calls], [["calibredb","add"],["calibredb","export"]])
             self.assertEqual(archive.read_bytes(), b"encrypted source placeholder")
 
+
+    class FakeHTTPStatusError(Exception):
+        def __init__(self, status_code, message=""):
+            super().__init__(f"HTTP {status_code}")
+            self.response = Mock(status_code=status_code)
+            if message:
+                self.response.json.return_value = {"message": message}
+            else:
+                self.response.json.side_effect = ValueError("no json")
+
+    class FakeTransportError(Exception):
+        pass
+
+    def _run_sync(self, state, books, receipts, xml_body, download_fn, convert_fn=None,
+                  only=None, retry_skipped=False, runtime_id="runtime-v1"):
+        args = types.SimpleNamespace(state=state, books=books, receipts=receipts,
+                                     only=only, scan_only=False, retry_skipped=retry_skipped)
+        credentials = types.SimpleNamespace(serial="SYNTHETIC", account_secrets=["SYNTHETIC"])
+        store = Mock(accounts=[types.SimpleNamespace(credentials=credentials)])
+        client = Mock()
+        client.__enter__ = Mock(return_value=client)
+        client.__exit__ = Mock(return_value=False)
+        client.http.get.return_value.content = page(xml_body)
+        client.download.side_effect = download_fn
+
+        def publish(source, library, receipt_dir, origin="inbox"):
+            identifier = source.stem
+            target = library / f"Kindle [{identifier}]" / f"book{source.suffix}"
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(source, target)
+            (receipt_dir / f"{identifier}{source.suffix}.json").write_text(
+                json.dumps({"sha256": sync.digest(target), "origin": origin}))
+            return "imported"
+
+        importer = Mock()
+        importer.import_file.side_effect = publish
+        if convert_fn is None:
+            def convert_fn(archive, destination, *unused):
+                destination.write_bytes(("validated " + archive.stem).encode())
+                return destination
+
+        modules = {
+            "kindl.auth": types.SimpleNamespace(AccountStore=Mock(load=Mock(return_value=store))),
+            "kindl.client": types.SimpleNamespace(AmazonDeviceClient=Mock(return_value=client),
+                                                  LIBRARY_URL="https://synthetic.invalid/library"),
+            "httpx": types.SimpleNamespace(HTTPStatusError=self.FakeHTTPStatusError,
+                                           TransportError=self.FakeTransportError),
+        }
+        with patch.dict(sys.modules, modules), \
+             patch.dict(os.environ, {"KINDLE_RUNTIME_ID": runtime_id}), \
+             patch.object(sync, "load_importer", return_value=importer), \
+             patch.object(sync, "offline"), patch.object(sync, "prepare_keys"), \
+             patch.object(sync, "convert", side_effect=convert_fn), \
+             patch.object(sync.shutil, "disk_usage", return_value=types.SimpleNamespace(free=50 * 1024**3)):
+            return sync.run(args), client
+
+    def _make_state_dirs(self, base):
+        state = base / "state"
+        state.mkdir(mode=0o700)
+        config = state / "config.json"
+        config.write_text("{}")
+        config.chmod(0o600)
+        books = base / "books"
+        receipts = base / "receipts"
+        books.mkdir()
+        receipts.mkdir()
+        return state, books, receipts
+
+    def _seed_existing(self, state, books, receipts, identifier, version="v1"):
+        record = {"version": version, "format": "epub"}
+        target = books / f"Kindle [{identifier}]" / "book.epub"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(f"book-{identifier}".encode())
+        hashed = sync.digest(target)
+        record["sha256"] = hashed
+        (receipts / f"{identifier}.epub.json").write_text(json.dumps({"sha256": hashed, "origin": "sync"}))
+        ledger = state / "state.json"
+        data = json.loads(ledger.read_text()) if ledger.exists() else {"books": {}}
+        data["books"][identifier] = record
+        sync.save(ledger, data)
+
+    def test_unchanged_resets_denied_while_three_consecutive_owned_403s_abort(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            state, books, receipts = self._make_state_dirs(Path(temporary))
+            for identifier in ("B000000002", "B000000005"):
+                self._seed_existing(state, books, receipts, identifier,
+                                    version=sync.parse_page(page(item(identifier)))[0][identifier]["version"])
+            xml_body = "".join(item(f"B00000000{i}") for i in range(1, 7))
+            def make_dl(err_map):
+                def _dl(identifier, output_dir, **kwargs):
+                    if identifier in err_map:
+                        raise err_map[identifier]
+                    output_dir.mkdir(parents=True)
+                    (output_dir / "synthetic.azw8").write_bytes(b"ok")
+                return _dl
+            # Scattered 403s separated by unchanged items reach the end (0 unprocessed)
+            err_map = {k: self.FakeHTTPStatusError(403) for k in ("B000000001", "B000000003", "B000000004", "B000000006")}
+            rc, _ = self._run_sync(state, books, receipts, xml_body, make_dl(err_map))
+            self.assertEqual(rc, 1)
+            summary = json.loads((state / "last-run.json").read_text())
+            self.assertEqual(summary["unchanged"], 2)
+            self.assertEqual(summary["unprocessed"], 0)
+            self.assertEqual(set(summary["failed"]), {"B000000001", "B000000003", "B000000004", "B000000006"})
+            # Three consecutive owned 403s (without B000000005 unchanged) still abort before B000000006
+            ledger = json.loads((state / "state.json").read_text())
+            ledger["books"].pop("B000000005")
+            sync.save(state / "state.json", ledger)
+            (books / "Kindle [B000000005]" / "book.epub").unlink()
+            (receipts / "B000000005.epub.json").unlink()
+            err_map["B000000005"] = self.FakeHTTPStatusError(403)
+            rc, _ = self._run_sync(state, books, receipts, xml_body, make_dl(err_map))
+            self.assertEqual(rc, 1)
+            summary = json.loads((state / "last-run.json").read_text())
+            self.assertEqual(summary["unprocessed"], 1)
+            self.assertNotIn("B000000006", summary["failed"])
+
+    def test_temporary_and_loan_ended_403s_skip_and_retry_on_purchase(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            state, books, receipts = self._make_state_dirs(Path(temporary))
+            xml_body = (
+                item("B000000001", origin="PublicLibraryLending")
+                + item("B000000002", origin="KindleUnlimited")
+                + item("B000000003", origin="Rental")
+                + item("B000000004", origin="Sample")
+                + item("B000000005", origin="Purchase")
+            )
+            calls = []
+            purchased = [False]
+            def dl(identifier, output_dir, **kwargs):
+                calls.append(identifier)
+                if identifier == "B000000001":
+                    raise self.FakeHTTPStatusError(403, "This book was loaned to you and cannot be downloaded because the loan has ended.")
+                if identifier in ("B000000003", "B000000004") or (identifier == "B000000002" and not purchased[0]):
+                    raise self.FakeHTTPStatusError(403, "Access denied")
+                output_dir.mkdir(parents=True)
+                (output_dir / "synthetic.azw8").write_bytes(b"ok")
+            rc, _ = self._run_sync(state, books, receipts, xml_body, dl)
+            self.assertEqual(rc, 0)
+            self.assertTrue((state / "last-success").exists())
+            summary = json.loads((state / "last-run.json").read_text())
+            self.assertEqual(summary["imported"], 1)
+            self.assertEqual(len(summary["skipped"]), 4)
+            self.assertEqual(summary["skipped"]["B000000001"]["reason"], "loan_ended")
+            self.assertEqual(summary["skipped"]["B000000002"]["reason"], "entitlement_ended")
+            # Next run skips all 4 without calling client.download
+            calls.clear()
+            rc, _ = self._run_sync(state, books, receipts, xml_body, dl)
+            self.assertEqual(rc, 0)
+            self.assertEqual(calls, [])
+            # Purchasing B000000002 changes origins and retries download automatically
+            purchased[0] = True
+            purchased_xml = xml_body.replace(
+                item("B000000002", origin="KindleUnlimited"),
+                item("B000000002", origin="Purchase"),
+            )
+            rc, _ = self._run_sync(state, books, receipts, purchased_xml, dl)
+            self.assertEqual(rc, 0)
+            self.assertEqual(calls, ["B000000002"])
+            self.assertIn("B000000002", json.loads((state / "state.json").read_text())["books"])
+
+    def test_repeated_deterministic_failures_park_and_transient_errors_do_not(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            state, books, receipts = self._make_state_dirs(Path(temporary))
+            xml_body = item("B000000001") + item("B000000002") + item("B000000003")
+            dl_calls, conv_calls = [], []
+            fail_transient = [True]
+            def dl(identifier, output_dir, **kwargs):
+                dl_calls.append(identifier)
+                if identifier == "B000000002":
+                    raise self.FakeHTTPStatusError(403)
+                if identifier == "B000000003" and fail_transient[0]:
+                    raise self.FakeHTTPStatusError(500)
+                output_dir.mkdir(parents=True)
+                (output_dir / "synthetic.azw8").write_bytes(b"ok")
+            def conv(archive, destination, *unused):
+                conv_calls.append(archive.stem)
+                if archive.stem == "B000000001":
+                    raise ValueError("decryption failed")
+                destination.write_bytes(b"ok")
+                return destination
+            # Run 1: B000000001 (conv) and B000000002 (403) fail once (attempts=1), B000000003 (500) fails without parking
+            self.assertEqual(self._run_sync(state, books, receipts, xml_body, dl, conv)[0], 1)
+            # Run 2: B000000001 and B000000002 fail twice -> parked; B000000003 fails 500 -> still not parked
+            self.assertEqual(self._run_sync(state, books, receipts, xml_body, dl, conv)[0], 1)
+            ledger = json.loads((state / "state.json").read_text())
+            self.assertEqual(set(ledger["skipped"]), {"B000000001", "B000000002"})
+            self.assertNotIn("B000000003", ledger["skipped"])
+            self.assertNotIn("B000000003", ledger.get("failures", {}))
+            # Run 3: B000000003 succeeds, B000000001 and B000000002 are skipped cleanly -> return 0
+            fail_transient[0] = False
+            dl_calls.clear(); conv_calls.clear()
+            rc, _ = self._run_sync(state, books, receipts, xml_body, dl, conv)
+            self.assertEqual(rc, 0)
+            self.assertEqual(dl_calls, ["B000000003"])
+            self.assertEqual(conv_calls, ["B000000003"])
+            # Runtime upgrade invalidates conversion skip for B000000001 only, not download skip for B000000002
+            dl_calls.clear(); conv_calls.clear()
+            self._run_sync(state, books, receipts, xml_body, dl, conv, runtime_id="runtime-v2")
+            self.assertEqual(conv_calls, ["B000000001"])
+            self.assertEqual(dl_calls, [])
+            # --retry-skipped retries both parked items
+            dl_calls.clear(); conv_calls.clear()
+            self._run_sync(state, books, receipts, xml_body, dl, conv, retry_skipped=True, runtime_id="runtime-v2")
+            self.assertEqual(conv_calls, ["B000000001"])
+            self.assertEqual(dl_calls, ["B000000002"])
+            # TransportError is never parked
+            def dl_transport(identifier, output_dir, **kwargs):
+                raise self.FakeTransportError("reset")
+            for _ in range(3):
+                self._run_sync(state, books, receipts, item("B000000009"), dl_transport)
+            ledger = json.loads((state / "state.json").read_text())
+            self.assertNotIn("B000000009", ledger.get("skipped", {}))
+
+    def test_known_existing_adopts_inbox_and_legacy_receipts_but_rejects_sync_or_external_mismatch(self):
+        with tempfile.TemporaryDirectory() as temp:
+            base = Path(temp); books = base / "books"; receipts = base / "receipts"
+            target = books / "Kindle [B000000001]" / "book.epub"
+            target.parent.mkdir(parents=True); receipts.mkdir()
+            target.write_bytes(b"manual-book")
+            manual_hash = sync.digest(target)
+            receipt = receipts / "B000000001.epub.json"
+            importer = Mock()
+            # Legacy receipt (no origin field) and inbox receipt are adopted when state[books] has an older hash
+            for origin_fields in ({}, {"origin": "inbox"}):
+                receipt.write_text(json.dumps({"sha256": manual_hash, **origin_fields}))
+                self.assertEqual(
+                    sync.known_existing("B000000001", {"version": "v1"},
+                                        {"version": "v1", "sha256": "older-sync-hash"}, books, receipts, importer),
+                    manual_hash,
+                )
+            # Sync receipt with hash mismatch against state[books] still fails
+            receipt.write_text(json.dumps({"sha256": manual_hash, "origin": "sync"}))
+            with self.assertRaisesRegex(ValueError, "acquisition receipt"):
+                sync.known_existing("B000000001", {"version": "v1"},
+                                    {"version": "v1", "sha256": "older-sync-hash"}, books, receipts, importer)
+            # External tampering (target != receipt) still fails regardless of origin
+            target.write_bytes(b"tampered")
+            receipt.write_text(json.dumps({"sha256": manual_hash, "origin": "inbox"}))
+            with self.assertRaisesRegex(ValueError, "outside its importer"):
+                sync.known_existing("B000000001", {"version": "v1"},
+                                    {"version": "v1", "sha256": "older-sync-hash"}, books, receipts, importer)
 
     def test_expired_loan_requires_exact_amazon_message(self):
         response = Mock(status_code=403)

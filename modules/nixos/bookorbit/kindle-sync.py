@@ -18,6 +18,30 @@ import zipfile
 
 IDENTIFIER = re.compile(r"(?:[A-Z0-9]{10}|[A-Za-z0-9]{32})\Z")
 FORMATS = ("epub", "pdf", "mobi", "azw", "azw3")
+TEMPORARY_ORIGINS = frozenset({"PublicLibraryLending", "KindleUnlimited", "Rental", "Sample"})
+
+
+def is_temporary_origin(record):
+    origins = set(record.get("origins", []))
+    return bool(origins) and origins.issubset(TEMPORARY_ORIGINS)
+
+
+def skip_matches(entry, record, device_hash, runtime_id):
+    if not isinstance(entry, dict) or entry.get("version") != record["version"] or entry.get("device") != device_hash:
+        return False
+    if entry.get("stage") == "download":
+        return entry.get("origins") == record["origins"]
+    if entry.get("stage") == "conversion":
+        return entry.get("runtime") == runtime_id
+    return False
+
+
+def is_parkable_failure(stage, error, status):
+    if stage == "conversion":
+        return isinstance(error, (ValueError, subprocess.CalledProcessError, subprocess.TimeoutExpired))
+    if stage == "download":
+        return status in (403, 404, 410) or isinstance(error, ValueError)
+    return False
 
 
 def save(path, data):
@@ -156,11 +180,12 @@ def known_existing(identifier, record, previous, books, receipts, importer):
     if not target.is_file() or target.is_symlink() or not receipt.is_file() or receipt.is_symlink():
         return None
     current_hash = digest(target)
-    if json.loads(receipt.read_text()).get("sha256") != current_hash:
+    receipt_data = json.loads(receipt.read_text())
+    if receipt_data.get("sha256") != current_hash:
         raise ValueError("BookOrbit file changed outside its importer")
     if previous and previous.get("version") != record["version"]:
         return None
-    if previous and previous.get("sha256") != current_hash:
+    if previous and previous.get("sha256") != current_hash and receipt_data.get("origin") == "sync":
         raise ValueError("Published file differs from acquisition receipt")
     importer.validate(target, extension)
     return current_hash
@@ -232,7 +257,7 @@ def recover_prepared(identifier, record, state, root, books, receipts, importer)
     if target.exists() and (target.is_symlink() or digest(target) != prepared["sha256"]):
         return
     # Complete publication/receipt interrupted after the durable preparation.
-    importer.import_file(source, books, receipts)
+    importer.import_file(source, books, receipts, origin="sync")
     state["books"][identifier] = prepared
     state["prepared"].pop(identifier)
     save(root / "state.json", state)
@@ -286,7 +311,9 @@ def run(args):
                "CALIBRE_TEMP_DIR": str(root / "work"), "QT_QPA_PLATFORM": "offscreen"}
         offline(["bookorbit-kindle-init-calibre"], root / "logs/initialize.log", env)
         prepare_keys(account.credentials, root / "calibre-config")
-        errors, imported, unchanged, denied = {}, 0, 0, 0
+        runtime_id = os.environ.get("KINDLE_RUNTIME_ID", "default")
+        retry_skipped = getattr(args, "retry_skipped", False)
+        errors, skipped, imported, unchanged, denied = {}, {}, 0, 0, 0
         for identifier in selected:
             record = items[identifier]
             stage = "existing-file validation"
@@ -297,9 +324,19 @@ def run(args):
                 if existing:
                     state["books"][identifier] = {"version": record["version"], "sha256": existing,
                                                   "format": previous.get("format", "epub") if previous else "epub"}
+                    state.get("failures", {}).pop(identifier, None)
+                    state.get("skipped", {}).pop(identifier, None)
                     unchanged += 1
+                    denied = 0
                     save(ledger, state)
                     continue
+                prior_skip = state.get("skipped", {}).get(identifier)
+                if not args.only and not retry_skipped and skip_matches(prior_skip, record, device_hash, runtime_id):
+                    skipped[identifier] = {k: prior_skip[k] for k in ("stage", "reason", "error", "http_status") if k in prior_skip}
+                    continue
+                if prior_skip is not None:
+                    state["skipped"].pop(identifier, None)
+                    save(ledger, state)
                 if shutil.disk_usage(root).free < 10 * 1024**3:
                     raise OSError("Disk reserve reached")
                 stage = "download"
@@ -334,8 +371,10 @@ def run(args):
                 stage = "import"
                 state.setdefault("prepared", {})[identifier] = {"version": record["version"], "sha256": digest(output), "format": extension}
                 save(ledger, state)
-                result = importer.import_file(output, args.books, args.receipts)
+                result = importer.import_file(output, args.books, args.receipts, origin="sync")
                 state["books"][identifier] = state["prepared"].pop(identifier)
+                state.get("failures", {}).pop(identifier, None)
+                state.get("skipped", {}).pop(identifier, None)
                 save(ledger, state)
                 imported += 1
                 denied = 0
@@ -343,21 +382,62 @@ def run(args):
             except Exception as error:
                 # HTTP messages can contain signed URLs; never put them in the journal/alerts.
                 status = error.response.status_code if isinstance(error, httpx.HTTPStatusError) else None
-                errors[identifier] = {"stage": stage, "error": type(error).__name__, "http_status": status}
                 ended = status == 403 and expired_loan(error.response)
-                if ended:
-                    errors[identifier]["reason"] = "loan_ended"
+                if stage == "download" and status == 403 and (ended or is_temporary_origin(record)):
+                    reason = "loan_ended" if ended else "entitlement_ended"
+                    state.setdefault("skipped", {})[identifier] = {
+                        "stage": stage, "error": type(error).__name__, "http_status": status,
+                        "reason": reason, "version": record["version"], "origins": record["origins"],
+                        "device": device_hash, "recorded_at": int(time.time()),
+                    }
+                    state.get("failures", {}).pop(identifier, None)
+                    save(ledger, state)
+                    skipped[identifier] = {"stage": stage, "reason": reason, "error": type(error).__name__, "http_status": status}
+                    denied = 0
+                    print(f"{identifier}: SKIPPED during {stage} ({reason}, HTTP {status})", flush=True)
+                    continue
+                errors[identifier] = {"stage": stage, "error": type(error).__name__, "http_status": status}
                 print(f"{identifier}: FAILED during {stage} ({type(error).__name__}, HTTP {status})", flush=True)
+                if is_parkable_failure(stage, error, status):
+                    signature = {
+                        "stage": stage, "error": type(error).__name__, "http_status": status,
+                        "version": record["version"], "origins": record["origins"], "device": device_hash,
+                        **({"runtime": runtime_id} if stage == "conversion" else {}),
+                    }
+                    prior = state.get("failures", {}).get(identifier)
+                    if isinstance(prior, dict) and all(prior.get(k) == v for k, v in signature.items()):
+                        attempts = prior.get("attempts", 1) + 1
+                    else:
+                        attempts = 1
+                    if attempts >= 2:
+                        state.setdefault("skipped", {})[identifier] = {
+                            **signature, "reason": "repeated_failure", "attempts": attempts, "recorded_at": int(time.time()),
+                        }
+                        state.get("failures", {}).pop(identifier, None)
+                    else:
+                        state.setdefault("failures", {})[identifier] = {
+                            **signature, "attempts": attempts, "recorded_at": int(time.time()),
+                        }
+                    save(ledger, state)
                 if status in (401, 429) or (stage == "download" and isinstance(error, (httpx.TransportError, RuntimeError))):
                     break  # Authentication/rate-limit/network/destination guard: no hammering.
-                denied = denied + 1 if status == 403 and not ended else 0
+                denied = denied + 1 if status == 403 else 0
                 if denied >= 3 or isinstance(error, OSError):
                     break
+        if not args.only:
+            pruned = False
+            for key in ("skipped", "failures"):
+                bucket = state.get(key, {})
+                for identifier in [entry for entry in bucket if entry not in items]:
+                    del bucket[identifier]
+                    pruned = True
+            if pruned:
+                save(ledger, state)
         summary = {"checked_at": int(time.time()), "inventory": len(items), "selected": len(selected),
-                   "imported": imported, "unchanged": unchanged, "failed": errors,
-                   "unprocessed": len(selected) - imported - unchanged - len(errors)}
+                   "imported": imported, "unchanged": unchanged, "skipped": skipped, "failed": errors,
+                   "unprocessed": len(selected) - imported - unchanged - len(skipped) - len(errors)}
         save(root / "last-run.json", summary)
-        print(f"Run complete: {imported} imported, {unchanged} unchanged, {len(errors)} failed, {summary['unprocessed']} unprocessed.", flush=True)
+        print(f"Run complete: {imported} imported, {unchanged} unchanged, {len(skipped)} skipped, {len(errors)} failed, {summary['unprocessed']} unprocessed.", flush=True)
         if errors or summary["unprocessed"]:
             return 1
         if not args.only:
@@ -372,6 +452,7 @@ def main():
     parser.add_argument("--receipts", type=Path, default=Path("/srv/books/.kindle-import"))
     parser.add_argument("--only")
     parser.add_argument("--scan-only", action="store_true")
+    parser.add_argument("--retry-skipped", action="store_true")
     args = parser.parse_args()
     os.umask(0o077)
     try:

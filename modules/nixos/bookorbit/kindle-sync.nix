@@ -1,6 +1,12 @@
 { config, lib, pkgs, ... }:
 let
   runtime = import ./kindle-runtime.nix { inherit pkgs; };
+  runtimeId = builtins.hashString "sha256" (builtins.concatStringsSep "\n" [
+    "${runtime.python}"
+    "${runtime.calibre}"
+    "${runtime.initializeConfig}"
+    "${./kindle-import.py}"
+  ]);
   cli = pkgs.writeShellApplication {
     name = "bookorbit-kindle-cli";
     runtimeInputs = [ runtime.python pkgs.util-linux ];
@@ -22,6 +28,7 @@ let
       umask 077
       export KINDL_PROFILE=android
       export KINDLE_IMPORTER=${./kindle-import.py}
+      export KINDLE_RUNTIME_ID=${runtimeId}
       unset KINDL_DEVICE_TYPE KINDL_SW KINDL_APP_NAME KINDL_APP_VERSION KINDL_OEM_PLATFORM
       unset KINDL_DEVICE_MODEL KINDL_OS_VERSION KINDL_REG KINDL_VOUCHER_VERSIONS KINDL_NO_VV
       exec 9>/run/lock/bookorbit-media.lock

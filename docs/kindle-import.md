@@ -115,13 +115,19 @@ do not write an active upload directly to a final `.epub` or `.pdf` pathname.
 | --- | --- |
 | `/srv/kindle-inbox/ASIN.epub` or `ASIN.pdf` | Completed exports; owner `ncwade`, private; source retained |
 | `/srv/books/ebooks/Kindle [ID]/book.format` | Validated EPUB, PDF, MOBI, AZW, or AZW3; owner `bookorbit` |
-| `/srv/books/.kindle-import/ASIN.format.json` | Import receipt and content hash, root-only |
+| `/srv/books/.kindle-import/ASIN.format.json` | Import receipt, content hash, and origin (`inbox` or `sync`), root-only |
+| `/srv/books/.kindle-import/inbox-imported.json` | Processed manual-inbox hashes so retained inbox files do not revert sync updates, root-only |
 | `/srv/books/.kindle-import/revisions/ASIN/hash.format` | Previous versions retained for recovery, root-only |
 
 `bookorbit-kindle.timer` runs every five minutes and catches up after boot.
 BookOrbit's separate five-minute library scan makes the book available, normally
 within ten minutes after queuing. The automated acquisition job calls the same
 importer directly after offline processing; it keeps its source packages in private acquisition state.
+Manual inbox imports record processed file hashes in `inbox-imported.json` and
+tag receipts with `"origin": "inbox"`, preventing retained older exports in
+`/srv/kindle-inbox` from overwriting newer automated `sync` updates while still
+allowing replaced manual files to override the library and failing closed on
+external edits to `/srv/books/ebooks`.
 
 Files are checked before publication: EPUB archive/package integrity and content
 encryption, or PDF structure/encryption using qpdf. Native MOBI/AZW/AZW3 checks
@@ -281,14 +287,24 @@ sudo cat /var/lib/bookorbit-kindle/last-run.json
 ```
 
 Only a complete successful acquisition/import pass advances `last-success`.
-Authentication/rate-limit/transport problems stop the run; individual conversion
-failures are retained while other books continue. An HTTP 403 with the exact
-observed Amazon message that a loan has ended is classified `loan_ended`; it
-does not count toward the stop after three unknown consecutive denials. It still
-remains a failed item and prevents a complete-success marker. Other 403 responses
-are not silently classified as expired loans. The connector health monitor
-tracks each incident until a later complete successful run. Grafana sends failure
-and recovery notifications, with four-hour reminders for continuing incidents.
+Authentication/rate-limit/transport problems stop the run; `denied` resets on
+imported, unchanged, and expected temporary-origin skips so scattered per-item
+denials do not abort the rest of the library pass. An HTTP 403 with Amazon's
+exact expired-loan message (`loan_ended`) or on a temporary-only origin
+(`PublicLibraryLending`, `KindleUnlimited`, `Rental`, `Sample`, classified
+`entitlement_ended`) is recorded in `state.json` under `skipped` for that
+`(version, origins, device)` instead of failing the run; purchasing or updating
+the item retries it automatically. Repeated deterministic per-book download
+(HTTP 403/404/410 or `ValueError`) or conversion failures (two consecutive
+identical failures) are likewise parked in `skipped` per `(version, device,
+runtime)` with `reason: "repeated_failure"` so they stop burning conversion CPU
+and repeating alerts; they retry automatically if the item's metadata, device
+identity, or Nix Calibre/DeDRM/KFX runtime changes, or manually via `sudo
+bookorbit-kindle-sync --retry-skipped` or `--only ASIN`. Transient errors (`401`,
+`429`, `5xx`, transport/network errors, disk reserve, and validation/import
+conflicts) are never parked. The connector health monitor tracks each incident
+until a later complete successful run. Grafana sends failure and recovery
+notifications, with four-hour reminders for continuing incidents.
 Acquisition is monitored separately from the five-minute manual-file importer.
 On 2026-11-13 the user confirmed both failure and recovery test notifications
 arrived with ntfy backgrounded or the iPhone locked. That historical acceptance

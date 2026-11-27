@@ -192,5 +192,59 @@ class ImportTests(unittest.TestCase):
         subprocess.run(["qpdf", "--encrypt", "reader", "owner", "256", "--", str(source), str(locked)], check=True)
         with self.assertRaisesRegex(ValueError, "encrypted"): kindle.validate(locked, "pdf")
 
+    def test_inbox_ledger_prevents_reverting_newer_sync_update_and_allows_new_manual_override(self):
+        inbox = self.root / "inbox"
+        inbox.mkdir()
+        manual_file = inbox / "B012345678.epub"
+        shutil.copyfile(self.source, manual_file)
+        owner = (os.getuid(), os.getgid())
+        self.assertEqual(kindle.import_inbox(inbox, self.books, self.state, owner), 0)
+        receipt = self.state / "B012345678.epub.json"
+        self.assertEqual(json.loads(receipt.read_text())["origin"], "inbox")
+        ledger = json.loads((self.state / "inbox-imported.json").read_text())
+        self.assertEqual(ledger["B012345678.epub"], kindle.digest(manual_file))
+
+        sync_src = self.root / "sync" / "B012345678.epub"
+        sync_src.parent.mkdir()
+        epub(sync_src, title="Newer Sync Version")
+        self.assertEqual(kindle.import_file(sync_src, self.books, self.state, owner, origin="sync"), "updated")
+        self.assertEqual(json.loads(receipt.read_text())["origin"], "sync")
+
+        # Retained older inbox file must not revert the newer sync copy.
+        self.assertEqual(kindle.import_inbox(inbox, self.books, self.state, owner), 0)
+        self.assertEqual(self.target.read_bytes(), sync_src.read_bytes())
+        self.assertEqual(json.loads(receipt.read_text())["origin"], "sync")
+
+        # Replacing the inbox file with a new manual export updates the library.
+        epub(manual_file, title="New Manual Override")
+        self.assertEqual(kindle.import_inbox(inbox, self.books, self.state, owner), 0)
+        self.assertEqual(self.target.read_bytes(), manual_file.read_bytes())
+        self.assertEqual(json.loads(receipt.read_text())["origin"], "inbox")
+        sync_hash = kindle.digest(sync_src)
+        self.assertEqual((self.state / "revisions/B012345678" / f"{sync_hash}.epub").read_bytes(), sync_src.read_bytes())
+
+    def test_inbox_initial_run_without_ledger_respects_newer_sync_mtime_and_detects_tampering(self):
+        inbox = self.root / "inbox"
+        inbox.mkdir()
+        manual_file = inbox / "B012345678.epub"
+        shutil.copyfile(self.source, manual_file)
+        os.utime(manual_file, (1000, 1000))
+        owner = (os.getuid(), os.getgid())
+
+        sync_src = self.root / "sync" / "B012345678.epub"
+        sync_src.parent.mkdir()
+        epub(sync_src, title="Sync Edition")
+        self.assertEqual(kindle.import_file(sync_src, self.books, self.state, owner, origin="sync"), "imported")
+
+        self.assertEqual(kindle.import_inbox(inbox, self.books, self.state, owner), 0)
+        self.assertEqual(self.target.read_bytes(), sync_src.read_bytes())
+        self.assertEqual(json.loads((self.state / "inbox-imported.json").read_text())["B012345678.epub"],
+                         kindle.digest(manual_file))
+
+        # External tampering on the published file must still fail closed.
+        self.target.write_bytes(b"tampered outside importer")
+        self.assertEqual(kindle.import_inbox(inbox, self.books, self.state, owner), 1)
+        self.assertEqual(self.target.read_bytes(), b"tampered outside importer")
+
 
 if __name__ == "__main__": unittest.main()

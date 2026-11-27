@@ -144,15 +144,29 @@ def regular(path):
     return stat.S_ISREG(path.lstat().st_mode)
 
 
-def write_receipt(receipt, temporary, asin, new_hash, source, target):
+def save_json(path, data):
+    fd, name = tempfile.mkstemp(prefix=".inbox-", dir=path.parent)
+    try:
+        os.chmod(name, 0o600)
+        with os.fdopen(fd, "w") as stream:
+            json.dump(data, stream, indent=2)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(name, path)
+    finally:
+        Path(name).unlink(missing_ok=True)
+
+
+def write_receipt(receipt, temporary, asin, new_hash, source, target, origin="inbox"):
     record = Path(temporary) / "receipt.json"
     record.write_text(json.dumps({"asin": asin, "sha256": new_hash, "source": source.name,
-                                  "target": str(target), "imported_at": int(time.time())}) + "\n")
+                                  "target": str(target), "origin": origin,
+                                  "imported_at": int(time.time())}) + "\n")
     record.chmod(0o600)
     os.replace(record, receipt)
 
 
-def import_file(source, books, state, owner=(2000, 2000)):
+def import_file(source, books, state, owner=(2000, 2000), origin="inbox"):
     match = re.fullmatch(r"([A-Z0-9]{10}|[A-Za-z0-9]{32})\.(epub|pdf|mobi|azw|azw3)", source.name)
     if not match or not regular(source):
         raise ValueError("expected a regular ASIN.epub, .pdf, .mobi, .azw, or .azw3 file")
@@ -183,7 +197,7 @@ def import_file(source, books, state, owner=(2000, 2000)):
                 # Complete an interrupted publication that had not yet saved its receipt.
                 if not receipt.exists() or json.loads(receipt.read_text()).get("sha256") != new_hash:
                     validate(staged, extension)
-                    write_receipt(receipt, temporary, asin, new_hash, source, target)
+                    write_receipt(receipt, temporary, asin, new_hash, source, target, origin=origin)
                 return "unchanged"
             previous = json.loads(receipt.read_text()) if receipt.exists() else {}
             if previous.get("sha256") != old_hash:
@@ -211,8 +225,58 @@ def import_file(source, books, state, owner=(2000, 2000)):
         with staged.open("rb") as ready:
             os.fsync(ready.fileno())
         os.replace(staged, target)
-        write_receipt(receipt, temporary, asin, new_hash, source, target)
+        write_receipt(receipt, temporary, asin, new_hash, source, target, origin=origin)
     return "updated" if old_hash else "imported"
+
+
+def import_inbox(inbox, books, state, owner=(2000, 2000)):
+    ledger_path = state / "inbox-imported.json"
+    ledger = json.loads(ledger_path.read_text()) if ledger_path.exists() else {}
+    dirty = False
+    errors = 0
+    present = set()
+    for source in sorted(inbox.iterdir()):
+        if source.name.startswith(".") or source.suffix not in (".epub", ".pdf", ".mobi", ".azw", ".azw3"):
+            continue  # Uploads ending in .part are never imported.
+        present.add(source.name)
+        try:
+            match = re.fullmatch(r"([A-Z0-9]{10}|[A-Za-z0-9]{32})\.(epub|pdf|mobi|azw|azw3)", source.name)
+            source_hash = None
+            if match and regular(source):
+                asin, extension = match.groups()
+                source_hash = digest(source)
+                target = books / f"Kindle [{asin}]" / f"book.{extension}"
+                receipt = state / f"{asin}.{extension}.json"
+                if target.is_file() and not target.is_symlink() and receipt.is_file() and not receipt.is_symlink():
+                    receipt_data = json.loads(receipt.read_text())
+                    target_hash = digest(target)
+                    if receipt_data.get("sha256") == target_hash:
+                        if ledger.get(source.name) == source_hash:
+                            print(source.name, "unchanged", flush=True)
+                            continue
+                        if receipt_data.get("origin") == "sync" and source.stat().st_mtime <= receipt_data.get("imported_at", 0):
+                            ledger[source.name] = source_hash
+                            dirty = True
+                            print(source.name, "unchanged", flush=True)
+                            continue
+            result = import_file(source, books, state, owner=owner, origin="inbox")
+            if source_hash is None:
+                source_hash = digest(source)
+            if ledger.get(source.name) != source_hash:
+                ledger[source.name] = source_hash
+                dirty = True
+            print(source.name, result, flush=True)
+        except (OSError, ValueError, KeyError, ET.ParseError, zipfile.BadZipFile) as error:
+            print(source.name, "FAILED:", error, flush=True)
+            errors += 1
+    stale = [name for name in ledger if name not in present]
+    if stale:
+        for name in stale:
+            ledger.pop(name, None)
+        dirty = True
+    if dirty:
+        save_json(ledger_path, ledger)
+    return 1 if errors else 0
 
 
 def main():
@@ -223,16 +287,7 @@ def main():
     args = parser.parse_args()
     if os.geteuid() != 0:
         parser.error("run through sudo bookorbit-kindle-import")
-    errors = 0
-    for source in sorted(args.inbox.iterdir()):
-        if source.name.startswith(".") or source.suffix not in (".epub", ".pdf", ".mobi", ".azw", ".azw3"):
-            continue  # Uploads ending in .part are never imported.
-        try:
-            print(source.name, import_file(source, args.books, args.state), flush=True)
-        except (OSError, ValueError, KeyError, ET.ParseError, zipfile.BadZipFile) as error:
-            print(source.name, "FAILED:", error, flush=True)
-            errors += 1
-    return 1 if errors else 0
+    return import_inbox(args.inbox, args.books, args.state)
 
 
 if __name__ == "__main__":
