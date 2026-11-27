@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      NIX_CONFIG: experimental-features = nix-command flakes
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Run Nix evaluation check suites
+        run: |
+          nix eval --impure --json --expr 'let f = builtins.getFlake ("path:" + toString ./.); in import ./tests/nas1.nix { host = f.nixosConfigurations.nas1; }'
+          nix eval --impure --json --expr 'let f = builtins.getFlake ("path:" + toString ./.); in import ./tests/tycho.nix { host = f.nixosConfigurations.tycho; installer = f.nixosConfigurations.tycho-installer; }'
+          nix eval --impure --json --expr 'let f = builtins.getFlake ("path:" + toString ./.); in import ./tests/bookorbit.nix { inherit (f.nixosConfigurations) nas1 tycho; }'
+          nix eval --impure --json --expr 'let f = builtins.getFlake ("path:" + toString ./.); in import ./tests/tailnet-services.nix { host = f.nixosConfigurations.tycho; }'
+
+      - name: Run offline Python tests
+        # Excluded from offline CI:
+        # - tests/bookorbit-runtime.py (requires Docker and pulling pinned OCI images)
+        # - tests/home-monitoring-alerting-integration.py (requires Docker and InfluxDB/Grafana containers)
+        # - tests/home-monitoring-alerting-runtime.py (must run inside the pinned Home Assistant image)
+        # - tests/home-monitoring-runtime.py (must run as root on live Tycho with local InfluxDB)
+        # - tests/home-monitoring.py (must run inside the pinned Home Assistant image)
+        run: |
+          python3 tests/bookorbit-alerts.py
+          python3 tests/bookorbit-audible.py
+          python3 tests/bookorbit-backup.py
+          python3 tests/bookorbit-kindle-sync.py
+          python3 tests/bookorbit-kindle.py
+          python3 tests/home-monitoring-alerting.py
+          python3 tests/home-monitoring-backup.py
+          python3 tests/home-monitoring-sso.py
+          publish_script=$(mktemp)
+          trap 'rm -f "$publish_script"' EXIT
+          nix eval --impure --raw --expr 'let f = builtins.getFlake ("path:" + toString ./.); in f.nixosConfigurations.tycho.config.systemd.services.tailnet-services-publish.script' > "$publish_script"
+          python3 tests/tailnet-services-publish.py "$publish_script"
