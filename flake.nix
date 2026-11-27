@@ -125,6 +125,7 @@
                 programs.pi = {
                   enable = true;
                   apertureBaseUrl = "https://aperture.tailf3d82.ts.net";
+                  defaultModel = "tycho/inkling-2-mini";
                 };
               };
             }
