@@ -21,9 +21,10 @@ OpenAI-compatible endpoint over the tailnet as `svc:llm`
 - **Inference server (`modules/nixos/llm/default.nix`):**
   - `llama-server` built from `llama.cpp` v1.1.0 with Vulkan support
   - Bound to loopback only (`127.0.0.1:8080`), `--alias inkling-2-mini`,
-    `--ctx-size 65536`, `--n-gpu-layers 99`, `--device Vulkan0`,
-    `--load-mode none`, `--flash-attn on`, `--jinja`, and
-    `GGML_VK_ALLOW_GRAPHICS_QUEUE=1`.
+    `--ctx-size 262144`, `--parallel 3`, `--kv-unified` (overriding the module
+    defaults of `ctxSize = 65536` / `parallel = 1` in `hosts/tycho/llm.nix`),
+    `--n-gpu-layers 99`, `--device Vulkan0`, `--load-mode none`,
+    `--flash-attn on`, `--jinja`, and `GGML_VK_ALLOW_GRAPHICS_QUEUE=1`.
   - Uses `ConditionPathExists` so Tycho boots cleanly even before weights are
     downloaded.
 
@@ -115,8 +116,8 @@ Port `8080` is loopback-only and must not be reachable from the LAN.
   (~504 MB) and enable `--spec-type draft-dspark --spec-draft-n-max 2`.
 - **Quantization or context adjustments:** `personal.llm.modelFile` /
   `modelSha256` (e.g., switching to `Inkling-2-Mini-UD-Q4_K_XL.gguf` for faster
-  generation and larger KV cache) and `personal.llm.ctxSize` can be changed in
-  `hosts/tycho/llm.nix`.
+  generation and larger KV cache), `personal.llm.ctxSize`, `personal.llm.parallel`,
+  and `personal.llm.kvUnified` can be changed in `hosts/tycho/llm.nix`.
 - **Recovery:** Model weights in `/var/lib/llama-cpp/models` are intentionally
   excluded from NAS1 backups; on a replacement host, re-run `sudo llm-fetch-models`
   to re-download and SHA-256 verify them.
@@ -128,3 +129,4 @@ Port `8080` is loopback-only and must not be reachable from the LAN.
 - Post-reboot kernel pool verified: `ttm.pages_limit = 11534336`, `mem_info_gtt_total = 47244640256` (~44 GiB), `Vulkan0: AMD Radeon 8060S Graphics (RADV STRIX_HALO) (45568 MiB)`.
 - `Inkling-2-Mini-UD-Q8_K_XL.gguf` and `mmproj-F16.gguf` SHA-256 verified and loaded in `llama-cpp.service` (`llama.cpp v1.1.0`, `n_ctx = 65536`, multimodal enabled).
 - Verified end-to-end over `https://llm.tailf3d82.ts.net` (Let's Encrypt cert, HTTP 308 redirect, `/health`, `/v1/models`, `/v1/chat/completions`) and through Aperture (`http://aperture.tailf3d82.ts.net/v1/chat/completions`, `HTTP 200`, ~24 tok/s), with BookOrbit, Grafana, and Home Assistant healthy and `0` failed systemd units.
+- Raised context to `256K` (`n_ctx = 262144`) with `parallel = 3` and `--kv-unified` (pre-change `/etc/nixos` backed up at `/var/lib/nixos-source-backups/llm-20261127T183955Z`): `/props` and `/slots` report `n_ctx = 262144` across all 3 slots, GTT reached ~33.94 GiB / 44.00 GiB under 3-way concurrent `/v1/chat/completions` requests with 24 GiB host RAM available, and `0` failed systemd units.

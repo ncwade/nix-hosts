@@ -213,6 +213,12 @@ in
       default = 1;
       description = "Number of concurrent slots in llama-server.";
     };
+
+    kvUnified = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = "Share a single unified KV cache pool across concurrent slots (--kv-unified).";
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -263,6 +269,9 @@ in
           top-p = "1.0";
           top-k = 0;
           min-p = "0.0";
+        }
+        // lib.optionalAttrs cfg.kvUnified {
+          kv-unified = true;
         }
         // lib.optionalAttrs (cfg.mmprojFile != null) {
           mmproj = mmprojPath;

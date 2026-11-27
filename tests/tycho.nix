@@ -69,6 +69,9 @@ assert !bootstrap.services.llama-cpp.openFirewall;
 assert bootstrap.services.llama-cpp.package.version == "1.1.0";
 assert bootstrap.services.llama-cpp.settings.host == "127.0.0.1";
 assert bootstrap.services.llama-cpp.settings.port == 8080;
+assert bootstrap.services.llama-cpp.settings.ctx-size == 262144;
+assert bootstrap.services.llama-cpp.settings.parallel == 3;
+assert bootstrap.services.llama-cpp.settings.kv-unified == true;
 assert bootstrap.services.llama-cpp.settings.alias == "inkling-2-mini";
 assert
   bootstrap.services.llama-cpp.settings.model
